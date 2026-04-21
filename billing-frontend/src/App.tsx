@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import LoginScreen from "@/screens/LoginScreen";
 import Sidebar from "@/components/Sidebar";
+import MobileNav from "@/components/MobileNav";
 import DashboardScreen from "@/screens/DashboardScreen";
 import InvoicesScreen from "@/screens/InvoicesScreen";
 import InvoiceFormScreen from "@/screens/InvoiceFormScreen";
@@ -100,7 +101,8 @@ const App = () => {
         <div className="min-h-screen premium-bg flex">
           <Sidebar active={screen} navigate={navigate} onLogout={handleLogout} />
           <main className="flex-1 min-w-0 relative z-10 overflow-x-hidden">
-            <div className="max-w-7xl mx-auto p-6 md:p-10">{renderScreen()}</div>
+            <MobileNav active={screen} navigate={navigate} onLogout={handleLogout} />
+            <div className="max-w-7xl mx-auto p-4 md:p-10">{renderScreen()}</div>
           </main>
         </div>
       </TooltipProvider>

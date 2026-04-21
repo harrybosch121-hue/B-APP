@@ -57,7 +57,7 @@ export default function PartyDetailScreen({ navigate, id }: Props) {
 
       <div className="premium-card rounded-2xl p-6 marble-noise relative grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2">
-          <h1 className="font-display text-4xl tracking-wide">{party.name}</h1>
+          <h1 className="font-display text-3xl md:text-4xl tracking-wide">{party.name}</h1>
           {party.address && <p className="text-sm text-muted-foreground mt-1">{party.address}</p>}
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground mt-2">
             {party.phone && <span>📞 {party.phone}</span>}

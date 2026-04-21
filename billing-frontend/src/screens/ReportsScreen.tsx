@@ -16,7 +16,7 @@ export default function ReportsScreen() {
   return (
     <div className="space-y-6 animate-fade-in">
       <header>
-        <h1 className="font-display text-4xl tracking-wide">Reports</h1>
+        <h1 className="font-display text-3xl md:text-4xl tracking-wide">Reports</h1>
         <p className="text-sm text-muted-foreground mt-1">Analyze sales, GST and customer activity</p>
       </header>
 

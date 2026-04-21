@@ -23,7 +23,7 @@ export default function DashboardScreen({ navigate }: Props) {
     <div className="space-y-8 animate-fade-in">
       <header className="flex items-end justify-between">
         <div>
-          <h1 className="font-display text-4xl tracking-wide">Dashboard</h1>
+          <h1 className="font-display text-3xl md:text-4xl tracking-wide">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">Overview of today's activity</p>
         </div>
         <button

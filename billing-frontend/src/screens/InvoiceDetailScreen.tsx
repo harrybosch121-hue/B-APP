@@ -106,7 +106,7 @@ export default function InvoiceDetailScreen({ navigate, id }: Props) {
       <div className="premium-card rounded-2xl p-8 marble-noise relative">
         <div className="flex flex-wrap justify-between gap-6 mb-8">
           <div>
-            <h1 className="font-display text-4xl tracking-wide">
+            <h1 className="font-display text-3xl md:text-4xl tracking-wide">
               {inv.voucher_type === 'SaleReturn' ? 'Credit Note' : 'Invoice'} #{inv.invoice_no}
               {inv.voucher_type === 'SaleReturn' && (
                 <span className="ml-3 align-middle text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive font-medium">RETURN</span>
@@ -116,7 +116,7 @@ export default function InvoiceDetailScreen({ navigate, id }: Props) {
           </div>
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Total</p>
-            <p className="font-display text-4xl text-primary">{fmtINR(inv.total)}</p>
+            <p className="font-display text-3xl md:text-4xl text-primary">{fmtINR(inv.total)}</p>
             <p className={`text-xs mt-1 ${inv.payment_mode === 'Cash' ? 'text-success' : 'text-primary'}`}>{inv.payment_mode}</p>
           </div>
         </div>

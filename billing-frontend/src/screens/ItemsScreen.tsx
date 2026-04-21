@@ -37,7 +37,7 @@ export default function ItemsScreen() {
     <div className="space-y-6 animate-fade-in">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl tracking-wide">Items</h1>
+          <h1 className="font-display text-3xl md:text-4xl tracking-wide">Items</h1>
           <p className="text-sm text-muted-foreground mt-1">{data?.length || 0} items</p>
         </div>
         <button onClick={openCreate} className="bg-primary text-primary-foreground rounded-xl px-5 py-2.5 text-sm font-medium shadow btn-press hover:opacity-95 flex items-center gap-2">

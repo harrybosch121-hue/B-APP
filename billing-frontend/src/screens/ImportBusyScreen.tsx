@@ -60,7 +60,7 @@ export default function ImportBusyScreen() {
   return (
     <div className="space-y-6 animate-fade-in max-w-3xl">
       <header>
-        <h1 className="font-display text-4xl tracking-wide">Busy Import</h1>
+        <h1 className="font-display text-3xl md:text-4xl tracking-wide">Busy Import</h1>
         <p className="text-sm text-muted-foreground mt-1">One-way import from Busy Accounting DAT exports</p>
       </header>
 

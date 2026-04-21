@@ -27,7 +27,7 @@ export default function InvoicesScreen({ navigate }: Props) {
     <div className="space-y-6 animate-fade-in">
       <header className="flex items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-4xl tracking-wide">Invoices</h1>
+          <h1 className="font-display text-3xl md:text-4xl tracking-wide">Invoices</h1>
           <p className="text-sm text-muted-foreground mt-1">{data?.length || 0} records</p>
         </div>
         <button
