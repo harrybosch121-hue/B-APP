@@ -9,10 +9,11 @@ import type { Screen } from "@/App";
 
 interface Props {
   navigate: (s: Screen, ctx?: { invoiceId?: string }) => void;
+  goBack?: (fallback?: Screen) => void;
   id: string;
 }
 
-export default function InvoiceDetailScreen({ navigate, id }: Props) {
+export default function InvoiceDetailScreen({ navigate, goBack, id }: Props) {
   const qc = useQueryClient();
   const { data: inv, isLoading } = useQuery({ queryKey: ["invoice", id], queryFn: () => api.getInvoice(id) });
 
@@ -83,8 +84,8 @@ export default function InvoiceDetailScreen({ navigate, id }: Props) {
   return (
     <div className="space-y-6 animate-fade-in">
       <header className="flex items-center justify-between gap-4">
-        <button onClick={() => navigate("invoices")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground btn-press">
-          <ArrowLeft className="w-4 h-4" /> Back to invoices
+        <button onClick={() => goBack ? goBack("invoices") : navigate("invoices")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground btn-press">
+          <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <div className="flex gap-2">
           <button onClick={handlePDF} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm btn-press hover:bg-muted/40">

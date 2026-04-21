@@ -7,10 +7,11 @@ import type { Screen } from "@/App";
 
 interface Props {
   navigate: (s: Screen) => void;
+  goBack?: (fallback?: Screen) => void;
   id: string;
 }
 
-export default function PartyStatementScreen({ navigate, id }: Props) {
+export default function PartyStatementScreen({ navigate, goBack, id }: Props) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const { data, isLoading } = useQuery({
@@ -33,7 +34,7 @@ export default function PartyStatementScreen({ navigate, id }: Props) {
       `}</style>
 
       <header className="flex items-center justify-between flex-wrap gap-3 no-print">
-        <button onClick={() => navigate("party-detail")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground btn-press">
+        <button onClick={() => goBack ? goBack("party-detail") : navigate("party-detail")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground btn-press">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <div className="flex items-center gap-3 flex-wrap">

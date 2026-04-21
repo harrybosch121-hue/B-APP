@@ -8,10 +8,11 @@ import type { Screen } from "@/App";
 
 interface Props {
   navigate: (s: Screen, ctx?: { invoiceId?: string }) => void;
+  goBack?: (fallback?: Screen) => void;
   id: string;
 }
 
-export default function PartyDetailScreen({ navigate, id }: Props) {
+export default function PartyDetailScreen({ navigate, goBack, id }: Props) {
   const qc = useQueryClient();
   const { data: party, isLoading } = useQuery({ queryKey: ["party", id], queryFn: () => api.getParty(id) });
   const [showPayment, setShowPayment] = useState(false);
@@ -42,7 +43,7 @@ export default function PartyDetailScreen({ navigate, id }: Props) {
   return (
     <div className="space-y-6 animate-fade-in">
       <header className="flex items-center justify-between">
-        <button onClick={() => navigate("parties")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground btn-press">
+        <button onClick={() => goBack ? goBack("parties") : navigate("parties")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground btn-press">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <div className="flex items-center gap-2">

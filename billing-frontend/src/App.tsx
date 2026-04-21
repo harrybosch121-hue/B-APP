@@ -39,11 +39,27 @@ const App = () => {
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
   const [selectedParty, setSelectedParty] = useState<string | null>(null);
+  const [history, setHistory] = useState<Array<{ screen: Screen; invoice: string | null; party: string | null }>>([]);
 
   const navigate = (s: Screen, ctx?: { invoiceId?: string; partyId?: string }) => {
+    setHistory((h) => [...h, { screen, invoice: selectedInvoice, party: selectedParty }].slice(-20));
     if (ctx?.invoiceId) setSelectedInvoice(ctx.invoiceId);
     if (ctx?.partyId) setSelectedParty(ctx.partyId);
     setScreen(s);
+  };
+
+  const goBack = (fallback: Screen = "dashboard") => {
+    setHistory((h) => {
+      const prev = h[h.length - 1];
+      if (prev) {
+        setScreen(prev.screen);
+        setSelectedInvoice(prev.invoice);
+        setSelectedParty(prev.party);
+        return h.slice(0, -1);
+      }
+      setScreen(fallback);
+      return h;
+    });
   };
 
   const handleLogout = () => {
@@ -75,13 +91,13 @@ const App = () => {
       case "invoice-edit":
         return selectedInvoice ? <InvoiceFormScreen navigate={navigate} editId={selectedInvoice} /> : null;
       case "invoice-detail":
-        return selectedInvoice ? <InvoiceDetailScreen navigate={navigate} id={selectedInvoice} /> : null;
+        return selectedInvoice ? <InvoiceDetailScreen navigate={navigate} goBack={goBack} id={selectedInvoice} /> : null;
       case "parties":
         return <PartiesScreen navigate={navigate} />;
       case "party-detail":
-        return selectedParty ? <PartyDetailScreen navigate={navigate} id={selectedParty} /> : null;
+        return selectedParty ? <PartyDetailScreen navigate={navigate} goBack={goBack} id={selectedParty} /> : null;
       case "party-statement":
-        return selectedParty ? <PartyStatementScreen navigate={navigate} id={selectedParty} /> : null;
+        return selectedParty ? <PartyStatementScreen navigate={navigate} goBack={goBack} id={selectedParty} /> : null;
       case "items":
         return <ItemsScreen />;
       case "reports":
