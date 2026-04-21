@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Party } from "@/lib/api";
-import { fmtINR } from "@/lib/format";
+import { fmtINR, fmtDate } from "@/lib/format";
 import { Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Screen } from "@/App";
@@ -59,9 +59,10 @@ export default function PartiesScreen({ navigate }: Props) {
              <thead className="bg-muted/30">
                <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                  <th className="py-3 px-4">Name</th>
-                 <th className="py-3 px-4">Phone</th>
-                 <th className="py-3 px-4">GSTIN</th>
-                 <th className="py-3 px-4 text-right">Credit Limit</th>
+                 <th className="py-3 px-4">State</th>
+                 <th className="py-3 px-4 text-right">Invoices</th>
+                 <th className="py-3 px-4">Last Sale</th>
+                 <th className="py-3 px-4 text-right">Total Business</th>
                  <th className="py-3 px-4 text-right">Outstanding</th>
                </tr>
              </thead>
@@ -71,9 +72,10 @@ export default function PartiesScreen({ navigate }: Props) {
                  return (
                    <tr key={p.id} onClick={() => navigate("party-detail", { partyId: p.id })} className="border-t border-border/20 hover:bg-muted/30 cursor-pointer">
                      <td className="py-3 px-4 font-medium">{p.name}</td>
-                     <td className="py-3 px-4 text-muted-foreground">{p.phone || "—"}</td>
-                     <td className="py-3 px-4 text-muted-foreground text-xs">{p.gstin || "—"}</td>
-                     <td className="py-3 px-4 text-right text-muted-foreground">{p.credit_limit ? fmtINR(p.credit_limit) : "—"}</td>
+                     <td className="py-3 px-4 text-muted-foreground text-xs">{p.state || "—"}</td>
+                     <td className="py-3 px-4 text-right text-muted-foreground">{p.invoice_count || 0}</td>
+                     <td className="py-3 px-4 text-muted-foreground text-xs">{p.last_invoice_date ? fmtDate(p.last_invoice_date) : "—"}</td>
+                     <td className="py-3 px-4 text-right text-muted-foreground">{p.total_invoiced ? fmtINR(p.total_invoiced) : "—"}</td>
                      <td className={`py-3 px-4 text-right font-medium ${overLimit ? "text-destructive" : (p.outstanding || 0) > 0 ? "text-foreground" : "text-muted-foreground"}`}>
                        {fmtINR(p.outstanding || 0)}{overLimit && " ⚠"}
                      </td>

@@ -84,6 +84,7 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
     returns: { totalInFile: saleReturns.length, imported: 0, skippedExisting: 0 },
     masters: { accountsInFile: masterAccounts.length, itemsInFile: masterItems.length, partiesCreated: 0, partiesSkippedExisting: 0, partiesSkippedNonParty: 0, itemsCreated: 0, itemsSkippedExisting: 0 },
     errors: [],
+    skipped: [],
   };
   const client = await pool.connect();
 
@@ -167,11 +168,13 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
       try {
         const vchNoRaw = sale.VchNo ?? sale.vchNo;
         if (vchNoRaw === undefined || vchNoRaw === null || vchNoRaw === '') {
-          stats.errors.push(`${labelPrefix}: missing VchNo`); return;
+          stats.skipped.push(`${labelPrefix}: missing VchNo (non-standard voucher series)`);
+          if (isReturn) stats.returns.skippedExisting++; else stats.skippedExisting++;
+          return;
         }
         const vchNo = parseInt(vchNoRaw, 10);
         if (!Number.isFinite(vchNo)) {
-          stats.errors.push(`${labelPrefix} "${vchNoRaw}": non-numeric VchNo (skipped)`);
+          stats.skipped.push(`${labelPrefix} "${vchNoRaw}": non-numeric VchNo (alternative series)`);
           if (isReturn) stats.returns.skippedExisting++; else stats.skippedExisting++;
           return;
         }

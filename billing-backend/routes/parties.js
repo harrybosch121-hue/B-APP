@@ -15,6 +15,8 @@ router.get('/', requireAuth, async (_req, res) => {
         p.*,
         COALESCE(SUM(CASE WHEN i.status = 'Active' THEN i.total ELSE 0 END), 0) AS total_invoiced,
         COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id), 0) AS total_paid,
+        COUNT(CASE WHEN i.status = 'Active' AND COALESCE(i.voucher_type, 'Sale') = 'Sale' THEN 1 END) AS invoice_count,
+        MAX(CASE WHEN i.status = 'Active' THEN i.date END) AS last_invoice_date,
         p.opening_balance
           + COALESCE(SUM(CASE WHEN i.status = 'Active' AND i.payment_mode = 'Credit' THEN i.total ELSE 0 END), 0)
           - COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id), 0) AS outstanding

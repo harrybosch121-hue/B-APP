@@ -34,6 +34,10 @@ export interface Party {
   credit_limit: number;
   opening_balance: number;
   outstanding?: number;
+  total_invoiced?: number;
+  total_paid?: number;
+  invoice_count?: number;
+  last_invoice_date?: string | null;
 }
 
 export interface Item {
@@ -184,6 +188,7 @@ export const api = {
         itemsSkippedExisting: number;
       };
       errors: string[];
+      skipped?: string[];
     }>(
       '/api/import/busy',
       { method: 'POST', body: fd },

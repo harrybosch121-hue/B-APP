@@ -173,6 +173,12 @@ export default function ImportBusyScreen() {
               {result.errors.slice(0, 50).map((e, i) => <p key={i} className="text-destructive/80">{e}</p>)}
             </div>
           )}
+          {result.skipped && result.skipped.length > 0 && (
+            <div className="bg-muted/30 border border-border rounded-lg p-4 text-xs space-y-1 max-h-64 overflow-y-auto">
+              <p className="font-medium text-muted-foreground">{result.skipped.length} non-standard vouchers skipped (alternative Busy series — safe to ignore)</p>
+              {result.skipped.slice(0, 50).map((e, i) => <p key={i} className="text-muted-foreground/80">{e}</p>)}
+            </div>
+          )}
         </div>
       )}
     </div>
