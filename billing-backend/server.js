@@ -10,6 +10,7 @@ const invoicesRoutes = require('./routes/invoices');
 const paymentsRoutes = require('./routes/payments');
 const reportsRoutes = require('./routes/reports');
 const importBusyRoutes = require('./routes/import-busy');
+const backupRoutes = require('./routes/backup');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -38,6 +39,7 @@ app.use('/api/invoices', invoicesRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/import', importBusyRoutes);
+app.use('/api/backup', backupRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err);

@@ -69,6 +69,7 @@ export interface InvoiceLine {
 export interface Invoice {
   id: string;
   invoice_no: number;
+  voucher_type?: 'Sale' | 'SaleReturn';
   date: string;
   party_id: string | null;
   party_name?: string;
@@ -108,6 +109,18 @@ export const api = {
   // parties
   getParties: () => request<Party[]>('/api/parties'),
   getParty: (id: string) => request<Party & { invoices: Invoice[]; payments: Payment[] }>(`/api/parties/${id}`),
+  getPartyStatement: (id: string, from?: string, to?: string) => {
+    const qs = new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) }).toString();
+    return request<{
+      party: Party;
+      from: string | null;
+      to: string | null;
+      opening: number;
+      closing: number;
+      generatedAt: string;
+      ledger: Array<{ date: string; type: string; ref: string; debit: number; credit: number; balance: number }>;
+    }>(`/api/parties/${id}/statement${qs ? `?${qs}` : ''}`);
+  },
   createParty: (p: Partial<Party>) => request<Party>('/api/parties', { method: 'POST', body: JSON.stringify(p) }),
   updateParty: (id: string, p: Partial<Party>) => request<Party>(`/api/parties/${id}`, { method: 'PUT', body: JSON.stringify(p) }),
 
@@ -160,6 +173,7 @@ export const api = {
       skippedExisting: number;
       partiesCreated: number;
       itemsCreated: number;
+      returns: { totalInFile: number; imported: number; skippedExisting: number };
       masters: {
         accountsInFile: number;
         itemsInFile: number;
@@ -177,4 +191,22 @@ export const api = {
     );
   },
   resetData: () => request<{ ok: boolean; message: string }>('/api/import/reset', { method: 'POST' }),
+
+  // backup / restore
+  downloadBackup: async () => {
+    const token = localStorage.getItem('billing_auth_token');
+    const res = await fetch(`${API_BASE_URL}/api/backup`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new Error('Backup failed');
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    a.href = url;
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/);
+    a.download = m ? m[1] : `billing-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };

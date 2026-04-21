@@ -1,12 +1,13 @@
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { Upload, FileCheck, AlertCircle, Trash2 } from "lucide-react";
+import { Upload, FileCheck, AlertCircle, Trash2, Download } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ImportBusyScreen() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [wiping, setWiping] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [result, setResult] = useState<Awaited<ReturnType<typeof api.importBusy>> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -20,9 +21,15 @@ export default function ImportBusyScreen() {
       const m = r.masters;
       const bits: string[] = [];
       if (r.totalInFile > 0) bits.push(`${r.imported}/${r.totalInFile} invoices`);
+      if (r.returns && r.returns.totalInFile > 0) bits.push(`${r.returns.imported}/${r.returns.totalInFile} returns`);
       if (m.accountsInFile > 0) bits.push(`${m.partiesCreated} parties`);
       if (m.itemsInFile > 0) bits.push(`${m.itemsCreated} items`);
-      toast.success(`Imported ${bits.join(", ") || "0 records"}`);
+      const summary = bits.join(", ") || "0 records";
+      if (r.errors.length > 0) {
+        toast.error(`Imported ${summary} — ${r.errors.length} errors. See details below.`);
+      } else {
+        toast.success(`Imported ${summary}`);
+      }
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -85,6 +92,27 @@ export default function ImportBusyScreen() {
         </div>
       </div>
 
+      <div className="premium-card rounded-2xl p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="font-display text-xl flex items-center gap-2"><Download className="w-4 h-4" /> Backup</h3>
+            <p className="text-xs text-muted-foreground mt-1">Download a full JSON snapshot of every party, item, invoice, payment and expense. Keep a copy before risky imports.</p>
+          </div>
+          <button
+            onClick={async () => {
+              setDownloading(true);
+              try { await api.downloadBackup(); toast.success("Backup downloaded"); }
+              catch (err) { toast.error((err as Error).message); }
+              finally { setDownloading(false); }
+            }}
+            disabled={downloading}
+            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium btn-press disabled:opacity-50 hover:opacity-95"
+          >
+            {downloading ? "Preparing..." : "Download backup"}
+          </button>
+        </div>
+      </div>
+
       <div className="premium-card rounded-2xl p-6 border border-destructive/30">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
@@ -110,6 +138,17 @@ export default function ImportBusyScreen() {
                 <Stat label="Skipped (existed)" value={String(result.skippedExisting)} />
                 <Stat label="Parties auto-created" value={String(result.partiesCreated)} />
                 <Stat label="Items auto-created" value={String(result.itemsCreated)} />
+              </div>
+            </div>
+          )}
+
+          {result.returns && result.returns.totalInFile > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Sale Returns</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Stat label="Total in file" value={String(result.returns.totalInFile)} />
+                <Stat label="Imported" value={String(result.returns.imported)} good />
+                <Stat label="Skipped (existed)" value={String(result.returns.skippedExisting)} />
               </div>
             </div>
           )}

@@ -14,6 +14,7 @@ import PartyDetailScreen from "@/screens/PartyDetailScreen";
 import ItemsScreen from "@/screens/ItemsScreen";
 import ReportsScreen from "@/screens/ReportsScreen";
 import ImportBusyScreen from "@/screens/ImportBusyScreen";
+import PartyStatementScreen from "@/screens/PartyStatementScreen";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -27,6 +28,7 @@ export type Screen =
   | "invoice-detail"
   | "parties"
   | "party-detail"
+  | "party-statement"
   | "items"
   | "reports"
   | "import";
@@ -77,6 +79,8 @@ const App = () => {
         return <PartiesScreen navigate={navigate} />;
       case "party-detail":
         return selectedParty ? <PartyDetailScreen navigate={navigate} id={selectedParty} /> : null;
+      case "party-statement":
+        return selectedParty ? <PartyStatementScreen navigate={navigate} id={selectedParty} /> : null;
       case "items":
         return <ItemsScreen />;
       case "reports":

@@ -111,6 +111,20 @@ async function initDb() {
     ALTER TABLE items   ADD COLUMN IF NOT EXISTS purchase_price REAL DEFAULT 0;
     ALTER TABLE items   ADD COLUMN IF NOT EXISTS opening_stock  REAL DEFAULT 0;
     ALTER TABLE items   ADD COLUMN IF NOT EXISTS print_name     TEXT;
+
+    -- Sale Returns (credit notes): same shape as invoices, just a different voucher_type.
+    -- Busy reuses the same VchNo across types, so the old UNIQUE(invoice_no) constraint must go.
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voucher_type TEXT NOT NULL DEFAULT 'Sale';
+    DO $migrate$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'invoices_invoice_no_key') THEN
+        ALTER TABLE invoices DROP CONSTRAINT invoices_invoice_no_key;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'invoices_source_type_no_unique') THEN
+        ALTER TABLE invoices ADD CONSTRAINT invoices_source_type_no_unique UNIQUE (source, voucher_type, invoice_no);
+      END IF;
+    END
+    $migrate$;
   `);
 
   const { rows } = await pool.query('SELECT COUNT(*) AS count FROM users');

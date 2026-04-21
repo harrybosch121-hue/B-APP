@@ -86,7 +86,12 @@ export default function InvoicesScreen({ navigate }: Props) {
                     onClick={() => navigate("invoice-detail", { invoiceId: inv.id })}
                     className="border-t border-border/20 hover:bg-muted/30 cursor-pointer transition"
                   >
-                    <td className="py-3 px-4 font-medium">#{inv.invoice_no}</td>
+                    <td className="py-3 px-4 font-medium">
+                      #{inv.invoice_no}
+                      {inv.voucher_type === 'SaleReturn' && (
+                        <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">RETURN</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-muted-foreground">{fmtDate(inv.date)}</td>
                     <td className="py-3 px-4">{inv.party_name || "—"}</td>
                     <td className="py-3 px-4">
@@ -95,7 +100,7 @@ export default function InvoicesScreen({ navigate }: Props) {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-xs text-muted-foreground">{inv.source}</td>
-                    <td className="py-3 px-4 text-right font-medium">{fmtINR(inv.total)}</td>
+                    <td className={`py-3 px-4 text-right font-medium ${inv.voucher_type === 'SaleReturn' ? 'text-destructive' : ''}`}>{fmtINR(inv.total)}</td>
                     <td className="py-3 px-4 text-right text-xs">
                       {inv.status === 'Cancelled' ? <span className="text-destructive">Cancelled</span> : <span className="text-success">Active</span>}
                     </td>

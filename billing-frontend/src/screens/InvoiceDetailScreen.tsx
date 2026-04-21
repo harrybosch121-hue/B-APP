@@ -106,7 +106,12 @@ export default function InvoiceDetailScreen({ navigate, id }: Props) {
       <div className="premium-card rounded-2xl p-8 marble-noise relative">
         <div className="flex flex-wrap justify-between gap-6 mb-8">
           <div>
-            <h1 className="font-display text-4xl tracking-wide">Invoice #{inv.invoice_no}</h1>
+            <h1 className="font-display text-4xl tracking-wide">
+              {inv.voucher_type === 'SaleReturn' ? 'Credit Note' : 'Invoice'} #{inv.invoice_no}
+              {inv.voucher_type === 'SaleReturn' && (
+                <span className="ml-3 align-middle text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive font-medium">RETURN</span>
+              )}
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">{fmtDate(inv.date)} • {inv.source} • <span className={inv.status === 'Cancelled' ? 'text-destructive font-medium' : 'text-success font-medium'}>{inv.status}</span></p>
           </div>
           <div className="text-right">

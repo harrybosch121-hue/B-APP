@@ -6,7 +6,7 @@ const { pool } = require('../db');
 const requireAuth = require('../middleware/auth');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200 * 1024 * 1024 } });
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -60,17 +60,19 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'Invalid XML: ' + err.message });
   }
 
-  // Busy DAT root may contain vouchers (<Sales><Sale>) and/or masters (<Accounts><Account>, <Items><Item>)
+  // Busy DAT root may contain vouchers (<Sales><Sale>, <SlRts><SaleReturn>) and/or masters (<Accounts><Account>, <Items><Item>)
   const root = parsed.BusyData || parsed.busydata || parsed;
   const salesContainer = root.Sales || root.sales || {};
   const sales = asArray(salesContainer.Sale || salesContainer.sale);
+  const returnsContainer = root.SlRts || root.slRts || root.SaleReturns || {};
+  const saleReturns = asArray(returnsContainer.SaleReturn || returnsContainer.saleReturn);
   const accountsContainer = root.Accounts || root.accounts || {};
   const masterAccounts = asArray(accountsContainer.Account || accountsContainer.account);
   const itemsContainer = root.Items || root.items || {};
   const masterItems = asArray(itemsContainer.Item || itemsContainer.item);
 
-  if (sales.length === 0 && masterAccounts.length === 0 && masterItems.length === 0) {
-    return res.status(400).json({ error: 'No <Sale>, <Account> or <Item> entries found in file' });
+  if (sales.length === 0 && saleReturns.length === 0 && masterAccounts.length === 0 && masterItems.length === 0) {
+    return res.status(400).json({ error: 'No <Sale>, <SaleReturn>, <Account> or <Item> entries found in file' });
   }
 
   const stats = {
@@ -79,6 +81,7 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
     skippedExisting: 0,
     partiesCreated: 0,
     itemsCreated: 0,
+    returns: { totalInFile: saleReturns.length, imported: 0, skippedExisting: 0 },
     masters: { accountsInFile: masterAccounts.length, itemsInFile: masterItems.length, partiesCreated: 0, partiesSkippedExisting: 0, partiesSkippedNonParty: 0, itemsCreated: 0, itemsSkippedExisting: 0 },
     errors: [],
   };
@@ -158,20 +161,25 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
     }
 
     // ---------- VOUCHERS ----------
-    for (const sale of sales) {
+    const processVoucher = async (sale, voucherType) => {
+      const isReturn = voucherType === 'SaleReturn';
+      const labelPrefix = isReturn ? 'SaleReturn' : 'Sale';
       try {
         const vchNoRaw = sale.VchNo ?? sale.vchNo;
         if (vchNoRaw === undefined || vchNoRaw === null || vchNoRaw === '') {
-          stats.errors.push('Missing VchNo'); continue;
+          stats.errors.push(`${labelPrefix}: missing VchNo`); return;
         }
         const vchNo = parseInt(vchNoRaw, 10);
 
         // Idempotent: skip if already imported
         const { rows: existing } = await client.query(
-          `SELECT id FROM invoices WHERE source = 'Busy' AND invoice_no = $1`,
-          [vchNo]
+          `SELECT id FROM invoices WHERE source = 'Busy' AND voucher_type = $1 AND invoice_no = $2`,
+          [voucherType, vchNo]
         );
-        if (existing[0]) { stats.skippedExisting++; continue; }
+        if (existing[0]) {
+          if (isReturn) stats.returns.skippedExisting++; else stats.skippedExisting++;
+          return;
+        }
 
         // Party — Busy stores under BillingDetails.PartyName, fallback MasterName1
         const billing = sale.BillingDetails || sale.billingDetails || {};
@@ -302,32 +310,38 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
 
         await client.query('BEGIN');
         const invoiceId = randomUUID();
+        // For SaleReturn we negate the totals so outstanding math just sums everything up.
+        const sign = isReturn ? -1 : 1;
+        const noteText = isReturn ? 'Sale Return imported from Busy DAT' : 'Imported from Busy DAT';
         await client.query(
-          `INSERT INTO invoices (id, invoice_no, date, party_id, payment_mode, subtotal, gst_amount, total, paid_amount, status, source, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Active', 'Busy', $10)`,
-          [invoiceId, vchNo, date, partyId, paymentMode, subtotal, gstAmount, total, paid, 'Imported from Busy DAT']
+          `INSERT INTO invoices (id, invoice_no, voucher_type, date, party_id, payment_mode, subtotal, gst_amount, total, paid_amount, status, source, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Active', 'Busy', $11)`,
+          [invoiceId, vchNo, voucherType, date, partyId, paymentMode, sign * subtotal, sign * gstAmount, sign * total, sign * paid, noteText]
         );
         for (const lr of lineRows) {
           await client.query(
             `INSERT INTO invoice_items (id, invoice_id, item_id, item_name_snapshot, hsn, qty, unit, price, gst_rate, line_total)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-            [randomUUID(), invoiceId, lr.itemId, lr.itemName, lr.hsn, lr.qty, lr.unit, lr.price, lr.gstRate, lr.lineTotal]
+            [randomUUID(), invoiceId, lr.itemId, lr.itemName, lr.hsn, sign * lr.qty, lr.unit, lr.price, lr.gstRate, sign * lr.lineTotal]
           );
         }
         if (paid > 0) {
           await client.query(
             `INSERT INTO payments (id, party_id, invoice_id, amount, mode, date, notes)
-             VALUES ($1, $2, $3, $4, $5, $6, 'Auto from Busy import')`,
-            [randomUUID(), partyId, invoiceId, paid, paymentMode, date]
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [randomUUID(), partyId, invoiceId, sign * paid, paymentMode, date, isReturn ? 'Auto-refund from Busy sale return' : 'Auto from Busy import']
           );
         }
         await client.query('COMMIT');
-        stats.imported++;
+        if (isReturn) stats.returns.imported++; else stats.imported++;
       } catch (innerErr) {
         await client.query('ROLLBACK').catch(() => {});
-        stats.errors.push(`Sale ${sale.VchNo || '?'}: ${innerErr.message}`);
+        stats.errors.push(`${labelPrefix} ${sale.VchNo || '?'}: ${innerErr.message}`);
       }
-    }
+    };
+
+    for (const sale of sales)        await processVoucher(sale, 'Sale');
+    for (const ret  of saleReturns)  await processVoucher(ret,  'SaleReturn');
 
     res.json(stats);
   } catch (err) {

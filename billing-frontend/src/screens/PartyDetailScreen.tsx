@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { fmtINR, fmtDate, todayISO } from "@/lib/format";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Plus, Printer } from "lucide-react";
 import { toast } from "sonner";
 import type { Screen } from "@/App";
 
@@ -45,9 +45,14 @@ export default function PartyDetailScreen({ navigate, id }: Props) {
         <button onClick={() => navigate("parties")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground btn-press">
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
-        <button onClick={() => setShowPayment(true)} className="bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-medium shadow btn-press hover:opacity-95 flex items-center gap-2">
-          <Plus className="w-4 h-4" /> Record Payment
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => navigate("party-statement")} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border text-sm btn-press hover:bg-muted/40">
+            <Printer className="w-4 h-4" /> Statement
+          </button>
+          <button onClick={() => setShowPayment(true)} className="bg-primary text-primary-foreground rounded-xl px-4 py-2 text-sm font-medium shadow btn-press hover:opacity-95 flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Record Payment
+          </button>
+        </div>
       </header>
 
       <div className="premium-card rounded-2xl p-6 marble-noise relative grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -139,7 +144,7 @@ export default function PartyDetailScreen({ navigate, id }: Props) {
                 <div>
                   <label className="text-xs uppercase tracking-wider text-muted-foreground">Mode</label>
                   <select value={payMode} onChange={(e) => setPayMode(e.target.value)} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none">
-                    <option>Cash</option><option>UPI</option><option>Bank</option><option>Cheque</option>
+                    <option>Cash</option><option>UPI</option><option>Bank</option><option>Cheque</option><option>Acc</option>
                   </select>
                 </div>
                 <div>

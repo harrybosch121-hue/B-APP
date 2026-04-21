@@ -6,6 +6,8 @@ const requireAuth = require('../middleware/auth');
 const router = express.Router();
 
 // GET all parties with computed outstanding
+// Outstanding logic: opening_balance + every Active credit invoice (Sale = +, SaleReturn = -, already negated in DB)
+//   minus all payments (returns store a negative auto-refund payment, so summing payments still nets correctly)
 router.get('/', requireAuth, async (_req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -13,7 +15,8 @@ router.get('/', requireAuth, async (_req, res) => {
         p.*,
         COALESCE(SUM(CASE WHEN i.status = 'Active' THEN i.total ELSE 0 END), 0) AS total_invoiced,
         COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id), 0) AS total_paid,
-        p.opening_balance + COALESCE(SUM(CASE WHEN i.status = 'Active' AND i.payment_mode = 'Credit' THEN i.total ELSE 0 END), 0)
+        p.opening_balance
+          + COALESCE(SUM(CASE WHEN i.status = 'Active' AND i.payment_mode = 'Credit' THEN i.total ELSE 0 END), 0)
           - COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id), 0) AS outstanding
       FROM parties p
       LEFT JOIN invoices i ON i.party_id = p.id
@@ -35,7 +38,8 @@ router.get('/:id', requireAuth, async (req, res) => {
     if (!party) return res.status(404).json({ error: 'Party not found' });
 
     const { rows: invoices } = await pool.query(
-      'SELECT id, invoice_no, date, payment_mode, total, paid_amount, status FROM invoices WHERE party_id = $1 ORDER BY date DESC, invoice_no DESC',
+      `SELECT id, invoice_no, voucher_type, date, payment_mode, total, paid_amount, status
+       FROM invoices WHERE party_id = $1 ORDER BY date DESC, invoice_no DESC`,
       [req.params.id]
     );
     const { rows: payments } = await pool.query(
@@ -49,6 +53,80 @@ router.get('/:id', requireAuth, async (req, res) => {
     const outstanding = Number(party.opening_balance) + totalInvoiced - totalPaid;
 
     res.json({ ...party, invoices, payments, outstanding });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET printable statement of account for a party
+// Returns chronological ledger: opening + every Active invoice (debit) + every payment (credit) with running balance.
+router.get('/:id/statement', requireAuth, async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const { rows: pRows } = await pool.query('SELECT * FROM parties WHERE id = $1', [req.params.id]);
+    const party = pRows[0];
+    if (!party) return res.status(404).json({ error: 'Party not found' });
+
+    const dateFilter = [];
+    const params = [req.params.id];
+    if (from) { params.push(from); dateFilter.push(`AND date >= $${params.length}`); }
+    if (to)   { params.push(to);   dateFilter.push(`AND date <= $${params.length}`); }
+
+    const { rows: invoices } = await pool.query(
+      `SELECT id, invoice_no, voucher_type, date, payment_mode, total, paid_amount, status
+       FROM invoices WHERE party_id = $1 AND status = 'Active' ${dateFilter.join(' ')}
+       ORDER BY date, invoice_no`,
+      params
+    );
+    const { rows: payments } = await pool.query(
+      `SELECT id, date, amount, mode, invoice_id, notes
+       FROM payments WHERE party_id = $1 ${dateFilter.join(' ')}
+       ORDER BY date, created_at`,
+      params
+    );
+
+    // Merge into a single chronological ledger with running balance.
+    const opening = Number(party.opening_balance) || 0;
+    const events = [];
+    for (const i of invoices) {
+      const isReturn = i.voucher_type === 'SaleReturn';
+      const amt = Number(i.total);
+      events.push({
+        date: i.date,
+        type: isReturn ? 'Sale Return' : (i.payment_mode === 'Credit' ? 'Credit Invoice' : 'Cash Invoice'),
+        ref: `#${i.invoice_no}`,
+        // Only credit invoices add to receivable. Cash invoice is settled on day-1 by auto-payment row.
+        debit: i.payment_mode === 'Credit' && !isReturn ? amt : 0,
+        credit: isReturn ? -amt : 0, // return total is stored negative; -(-x) = +x credit
+      });
+    }
+    for (const p of payments) {
+      events.push({
+        date: p.date,
+        type: `Payment (${p.mode})`,
+        ref: p.invoice_id ? '' : (p.notes || 'On account'),
+        debit: 0,
+        credit: Number(p.amount),
+      });
+    }
+    events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+    let running = opening;
+    const ledger = events.map(e => {
+      running = running + e.debit - e.credit;
+      return { ...e, balance: running };
+    });
+
+    res.json({
+      party,
+      from: from || null,
+      to: to || null,
+      opening,
+      ledger,
+      closing: running,
+      generatedAt: new Date().toISOString(),
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
