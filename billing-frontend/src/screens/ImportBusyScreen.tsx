@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { Upload, FileCheck, AlertCircle } from "lucide-react";
+import { Upload, FileCheck, AlertCircle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ImportBusyScreen() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [wiping, setWiping] = useState(false);
   const [result, setResult] = useState<Awaited<ReturnType<typeof api.importBusy>> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -21,6 +22,26 @@ export default function ImportBusyScreen() {
       toast.error((err as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleWipe = async () => {
+    const ok = window.confirm(
+      "WIPE ALL DATA?\n\nThis deletes every invoice, payment, customer, item and price. Your login is kept. This cannot be undone."
+    );
+    if (!ok) return;
+    const confirm2 = window.prompt('Type "DELETE" to confirm:');
+    if (confirm2 !== "DELETE") return toast.message("Cancelled");
+    setWiping(true);
+    try {
+      await api.resetData();
+      toast.success("All data wiped. Reloading...");
+      setResult(null);
+      setTimeout(() => window.location.reload(), 800);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setWiping(false);
     }
   };
 
@@ -55,6 +76,18 @@ export default function ImportBusyScreen() {
           <p>• Auto-creates parties and items as needed</p>
           <p>• Existing invoices (matched by Busy VchNo) are <strong>skipped</strong> — safe to re-import</p>
           <p>• Cash invoices auto-record full payment; Credit invoices remain outstanding</p>
+        </div>
+      </div>
+
+      <div className="premium-card rounded-2xl p-6 border border-destructive/30">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="font-display text-xl text-destructive flex items-center gap-2"><Trash2 className="w-4 h-4" /> Danger zone</h3>
+            <p className="text-xs text-muted-foreground mt-1">Wipe all invoices, payments, customers, items and prices. Login is preserved. Use this before re-importing if a previous import had wrong amounts.</p>
+          </div>
+          <button onClick={handleWipe} disabled={wiping} className="px-4 py-2 rounded-lg bg-destructive/10 text-destructive border border-destructive/30 hover:bg-destructive/20 text-sm font-medium btn-press disabled:opacity-50">
+            {wiping ? "Wiping..." : "Wipe all data"}
+          </button>
         </div>
       </div>
 

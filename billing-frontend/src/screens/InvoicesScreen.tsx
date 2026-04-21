@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { fmtINR } from "@/lib/format";
+import { fmtINR, fmtDate } from "@/lib/format";
 import { Search, Plus } from "lucide-react";
 import type { Screen } from "@/App";
 
@@ -87,7 +87,7 @@ export default function InvoicesScreen({ navigate }: Props) {
                     className="border-t border-border/20 hover:bg-muted/30 cursor-pointer transition"
                   >
                     <td className="py-3 px-4 font-medium">#{inv.invoice_no}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{inv.date}</td>
+                    <td className="py-3 px-4 text-muted-foreground">{fmtDate(inv.date)}</td>
                     <td className="py-3 px-4">{inv.party_name || "—"}</td>
                     <td className="py-3 px-4">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${inv.payment_mode === 'Cash' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'}`}>

@@ -15,15 +15,27 @@ const xmlParser = new XMLParser({
   parseTagValue: true,
 });
 
-const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+const asArray = (v) => (Array.isArray(v) ? v : v != null && v !== '' ? [v] : []);
+const num = (v) => {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
-const parseGstRate = (stptName) => {
-  if (!stptName) return 0;
-  const m = String(stptName).match(/(\d+(?:\.\d+)?)\s*%/);
+// Extract GST rate from "I/GST-18%", "GST 18%", "18%" etc.
+const parseGstRate = (s) => {
+  if (s == null) return 0;
+  const m = String(s).match(/(\d+(?:\.\d+)?)\s*%/);
   return m ? parseFloat(m[1]) : 0;
 };
 
-// Convert "01-04-2026" or "2026-04-01" to ISO date
+// "I/" prefix on STPTName means GST is INCLUSIVE in line Amt (Busy convention)
+const isInclusiveTax = (s) => {
+  if (!s) return false;
+  const x = String(s).toUpperCase();
+  return x.startsWith('I/') || x.includes('INCL');
+};
+
+// "01-04-2026" or "2026-04-01" -> "2026-04-01"
 const toIsoDate = (d) => {
   if (!d) return new Date().toISOString().slice(0, 10);
   const s = String(d).trim();
@@ -43,7 +55,7 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'Invalid XML: ' + err.message });
   }
 
-  // Locate sales nodes (Busy DAT root: <BusyData><Sales><Sale>...)
+  // Busy DAT root: <BusyData>...<Sales><Sale>...</Sale></Sales></BusyData>
   const root = parsed.BusyData || parsed.busydata || parsed;
   const salesContainer = root.Sales || root.sales || {};
   const sales = asArray(salesContainer.Sale || salesContainer.sale);
@@ -57,20 +69,31 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
   try {
     for (const sale of sales) {
       try {
-        const vchNo = sale.VchNo || sale.vchNo;
-        if (!vchNo) { stats.errors.push('Missing VchNo'); continue; }
+        const vchNoRaw = sale.VchNo ?? sale.vchNo;
+        if (vchNoRaw === undefined || vchNoRaw === null || vchNoRaw === '') {
+          stats.errors.push('Missing VchNo'); continue;
+        }
+        const vchNo = parseInt(vchNoRaw, 10);
 
-        // Skip if already imported
+        // Idempotent: skip if already imported
         const { rows: existing } = await client.query(
           `SELECT id FROM invoices WHERE source = 'Busy' AND invoice_no = $1`,
-          [parseInt(vchNo, 10)]
+          [vchNo]
         );
         if (existing[0]) { stats.skippedExisting++; continue; }
 
-        const partyName = (sale.PartyName || sale.partyName || 'Cash').toString().trim();
+        // Party — Busy stores under BillingDetails.PartyName, fallback MasterName1
+        const billing = sale.BillingDetails || sale.billingDetails || {};
+        const partyName = String(
+          billing.PartyName || billing.partyName ||
+          sale.MasterName1 || sale.masterName1 ||
+          'Cash'
+        ).trim() || 'Cash';
+
         const date = toIsoDate(sale.Date || sale.date);
-        const stptName = sale.STPTName || sale.stptName || '';
-        const gstRate = parseGstRate(stptName);
+        const headerStpt = sale.STPTName || sale.stptName || '';
+        const headerInclusive = isInclusiveTax(headerStpt);
+        const headerRate = parseGstRate(headerStpt);
 
         // Find or create party
         let partyId;
@@ -86,33 +109,55 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
           stats.partiesCreated++;
         }
 
-        // Item entries: Busy uses ItemEntries > ItemEntry, but fallbacks too
+        // Lines — Busy uses <ItemEntries><ItemDetail>...</ItemDetail></ItemEntries>
         const itemEntriesNode = sale.ItemEntries || sale.itemEntries || {};
-        let lineEntries = asArray(itemEntriesNode.ItemEntry || itemEntriesNode.itemEntry);
-        if (lineEntries.length === 0) {
-          // Single item flat
-          if (sale.ItemName || sale.itemName) {
-            lineEntries = [{
-              ItemName: sale.ItemName || sale.itemName,
-              Qty: sale.Qty || sale.qty || 1,
-              Price: sale.Price || sale.price || 0,
-            }];
-          }
+        let lineEntries = asArray(
+          itemEntriesNode.ItemDetail || itemEntriesNode.itemDetail ||
+          itemEntriesNode.ItemEntry || itemEntriesNode.itemEntry
+        );
+        if (lineEntries.length === 0 && (sale.ItemName || sale.itemName)) {
+          lineEntries = [{
+            ItemName: sale.ItemName || sale.itemName,
+            Qty: sale.Qty || sale.qty || 1,
+            Price: sale.Price || sale.price || 0,
+            Amt: sale.Amt || sale.amt,
+          }];
         }
 
-        let subtotal = 0;
+        let subtotal = 0;     // taxable value
         let gstAmount = 0;
+        let lineGrossSum = 0; // sum of line totals (incl. GST)
         const lineRows = [];
 
         for (const le of lineEntries) {
-          const itemName = (le.ItemName || le.itemName || 'Unknown').toString().trim();
-          const qty = parseFloat(le.Qty || le.qty || 1);
-          const price = parseFloat(le.Price || le.price || 0);
-          const lineRate = le.STPTName ? parseGstRate(le.STPTName) : gstRate;
-          const lineBase = qty * price;
-          const lineGst = lineBase * (lineRate / 100);
+          const itemName = String(le.ItemName || le.itemName || 'Unknown').trim() || 'Unknown';
+          const qty = num(le.Qty ?? le.qty ?? le.QtyMainUnit ?? 1) || 1;
+          const price = num(le.Price ?? le.price ?? le.ListPrice);
+          const amt = num(le.Amt ?? le.amt);
+          const nett = num(le.NettAmount ?? le.nettAmount);
+
+          // Per-line ItemTaxCategory ("GST 18%") overrides header rate
+          const lineTaxStr = le.ItemTaxCategory || le.itemTaxCategory || '';
+          let lineRate = parseGstRate(lineTaxStr);
+          if (!lineRate) lineRate = headerRate;
+          // Inclusive flag is determined by header STPTName regardless
+          const lineInclusive = headerInclusive;
+
+          let lineBase, lineGst, lineTotal;
+          if (lineInclusive && amt > 0) {
+            // Amt = gross (incl GST). Use NettAmount when present, else derive.
+            lineBase = nett > 0 ? nett : (lineRate ? amt / (1 + lineRate / 100) : amt);
+            lineGst = Math.max(0, amt - lineBase);
+            lineTotal = amt;
+          } else {
+            // Exclusive: Amt = taxable (or qty*price), GST added.
+            lineBase = amt > 0 ? amt : qty * price;
+            lineGst = lineBase * (lineRate / 100);
+            lineTotal = lineBase + lineGst;
+          }
           subtotal += lineBase;
           gstAmount += lineGst;
+          lineGrossSum += lineTotal;
 
           // Find or create item
           let itemId;
@@ -123,16 +168,45 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
             itemId = randomUUID();
             await client.query(
               `INSERT INTO items (id, name, default_price, gst_rate) VALUES ($1, $2, $3, $4)`,
-              [itemId, itemName, price, lineRate || 18]
+              [itemId, itemName, price, lineRate || 0]
             );
             stats.itemsCreated++;
           }
 
-          lineRows.push({ itemId, itemName, qty, price, gstRate: lineRate, lineTotal: lineBase + lineGst, hsn: le.HSN || le.hsn || null, unit: le.Unit || le.unit || 'Pcs' });
+          lineRows.push({
+            itemId,
+            itemName,
+            qty,
+            price,
+            gstRate: lineRate,
+            lineTotal,
+            hsn: le.HSN || le.hsn || null,
+            unit: le.UnitName || le.unitName || le.Unit || le.unit || 'Pcs',
+          });
         }
 
-        const total = subtotal + gstAmount;
-        const paymentMode = (sale.CashCredit || '').toString().toLowerCase().includes('credit') ? 'Credit' : 'Cash';
+        // Bill sundries (Discount, Round-off, etc.)
+        let sundryTotal = 0;
+        const sundriesNode = sale.BillSundries || sale.billSundries || {};
+        const sundries = asArray(sundriesNode.BSDetail || sundriesNode.bSDetail || sundriesNode.bsDetail);
+        for (const s of sundries) {
+          const name = String(s.BSName || s.bsName || '').toLowerCase();
+          const amount = num(s.Amt ?? s.amt);
+          if (!amount) continue;
+          if (name.includes('disc')) sundryTotal -= amount;
+          else sundryTotal += amount;
+        }
+
+        // Prefer Busy's authoritative total when present
+        const busyTotal = num(sale.tmpTotalAmt ?? sale.tmpSalePurcAmt);
+        const total = busyTotal > 0 ? busyTotal : Math.max(0, lineGrossSum + sundryTotal);
+
+        // Payment mode
+        const ofInfo = ((sale.VchOtherInfoDetails || {}).OFInfo) || {};
+        const ofText = String(ofInfo.OF1 || '').toUpperCase();
+        const cashAmt = num(((sale.POSVchData || {}).CashAmt));
+        const isCredit = ofText.includes('CREDIT') && cashAmt <= 0;
+        const paymentMode = isCredit ? 'Credit' : 'Cash';
         const paid = paymentMode === 'Cash' ? total : 0;
 
         await client.query('BEGIN');
@@ -140,7 +214,7 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
         await client.query(
           `INSERT INTO invoices (id, invoice_no, date, party_id, payment_mode, subtotal, gst_amount, total, paid_amount, status, source, notes)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Active', 'Busy', $10)`,
-          [invoiceId, parseInt(vchNo, 10), date, partyId, paymentMode, subtotal, gstAmount, total, paid, 'Imported from Busy DAT']
+          [invoiceId, vchNo, date, partyId, paymentMode, subtotal, gstAmount, total, paid, 'Imported from Busy DAT']
         );
         for (const lr of lineRows) {
           await client.query(
@@ -170,6 +244,16 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
     res.status(500).json({ error: 'Server error: ' + err.message, stats });
   } finally {
     client.release();
+  }
+});
+
+// POST /api/import/reset  — wipe all business data (keeps users)
+router.post('/reset', requireAuth, async (_req, res) => {
+  try {
+    await pool.query(`TRUNCATE payments, invoice_items, invoices, customer_prices, items, parties, expenses RESTART IDENTITY CASCADE`);
+    res.json({ ok: true, message: 'All business data wiped. Users preserved.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

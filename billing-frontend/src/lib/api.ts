@@ -154,4 +154,5 @@ export const api = {
       true
     );
   },
+  resetData: () => request<{ ok: boolean; message: string }>('/api/import/reset', { method: 'POST' }),
 };
