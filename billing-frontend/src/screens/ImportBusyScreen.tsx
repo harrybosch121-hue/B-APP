@@ -17,7 +17,12 @@ export default function ImportBusyScreen() {
     try {
       const r = await api.importBusy(file);
       setResult(r);
-      toast.success(`Imported ${r.imported} of ${r.totalInFile} invoices`);
+      const m = r.masters;
+      const bits: string[] = [];
+      if (r.totalInFile > 0) bits.push(`${r.imported}/${r.totalInFile} invoices`);
+      if (m.accountsInFile > 0) bits.push(`${m.partiesCreated} parties`);
+      if (m.itemsInFile > 0) bits.push(`${m.itemsCreated} items`);
+      toast.success(`Imported ${bits.join(", ") || "0 records"}`);
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -72,10 +77,11 @@ export default function ImportBusyScreen() {
 
         <div className="mt-6 text-xs text-muted-foreground bg-muted/30 rounded-lg p-4 space-y-1">
           <p><strong className="text-foreground">How it works:</strong></p>
-          <p>• Reads &lt;Sale&gt; entries from Busy DAT XML</p>
-          <p>• Auto-creates parties and items as needed</p>
-          <p>• Existing invoices (matched by Busy VchNo) are <strong>skipped</strong> — safe to re-import</p>
-          <p>• Cash invoices auto-record full payment; Credit invoices remain outstanding</p>
+          <p>• Accepts both file types — vouchers (e.g. <code>SBMT_…_Vh….DAT</code>) and masters (e.g. <code>SBMT_…_MSAll.DAT</code>)</p>
+          <p>• <strong>Vouchers</strong>: reads &lt;Sale&gt; entries; cash invoices auto-record full payment, credit invoices stay outstanding</p>
+          <p>• <strong>Masters</strong>: reads &lt;Account&gt; (Sundry Debtors → Customer, Sundry Creditors → Supplier) and &lt;Item&gt; (with MRP, unit, GST)</p>
+          <p>• Idempotent — existing invoices/parties/items are <strong>skipped</strong>, safe to re-upload</p>
+          <p>• Tip: import the <strong>masters file first</strong>, then the voucher file, so parties &amp; items already have addresses, GSTIN, MRP etc.</p>
         </div>
       </div>
 
@@ -94,13 +100,34 @@ export default function ImportBusyScreen() {
       {result && (
         <div className="premium-card rounded-2xl p-6 space-y-4">
           <h3 className="font-display text-2xl flex items-center gap-2"><FileCheck className="w-5 h-5 text-success" /> Import Complete</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Stat label="Total in file" value={String(result.totalInFile)} />
-            <Stat label="Imported" value={String(result.imported)} good />
-            <Stat label="Skipped (existed)" value={String(result.skippedExisting)} />
-            <Stat label="Parties created" value={String(result.partiesCreated)} />
-            <Stat label="Items created" value={String(result.itemsCreated)} />
-          </div>
+
+          {result.totalInFile > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Vouchers</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Stat label="Total in file" value={String(result.totalInFile)} />
+                <Stat label="Imported" value={String(result.imported)} good />
+                <Stat label="Skipped (existed)" value={String(result.skippedExisting)} />
+                <Stat label="Parties auto-created" value={String(result.partiesCreated)} />
+                <Stat label="Items auto-created" value={String(result.itemsCreated)} />
+              </div>
+            </div>
+          )}
+
+          {(result.masters.accountsInFile > 0 || result.masters.itemsInFile > 0) && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Masters</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Stat label="Accounts in file" value={String(result.masters.accountsInFile)} />
+                <Stat label="Parties created" value={String(result.masters.partiesCreated)} good />
+                <Stat label="Parties skipped (existed)" value={String(result.masters.partiesSkippedExisting)} />
+                <Stat label="Non-party ledgers skipped" value={String(result.masters.partiesSkippedNonParty)} />
+                <Stat label="Items in file" value={String(result.masters.itemsInFile)} />
+                <Stat label="Items created" value={String(result.masters.itemsCreated)} good />
+                <Stat label="Items skipped (existed)" value={String(result.masters.itemsSkippedExisting)} />
+              </div>
+            </div>
+          )}
           {result.errors.length > 0 && (
             <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 text-xs space-y-1 max-h-64 overflow-y-auto">
               <p className="font-medium text-destructive flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {result.errors.length} errors</p>

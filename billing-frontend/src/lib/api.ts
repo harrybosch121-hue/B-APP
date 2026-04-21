@@ -148,7 +148,23 @@ export const api = {
   importBusy: async (file: File) => {
     const fd = new FormData();
     fd.append('file', file);
-    return request<{ totalInFile: number; imported: number; skippedExisting: number; partiesCreated: number; itemsCreated: number; errors: string[] }>(
+    return request<{
+      totalInFile: number;
+      imported: number;
+      skippedExisting: number;
+      partiesCreated: number;
+      itemsCreated: number;
+      masters: {
+        accountsInFile: number;
+        itemsInFile: number;
+        partiesCreated: number;
+        partiesSkippedExisting: number;
+        partiesSkippedNonParty: number;
+        itemsCreated: number;
+        itemsSkippedExisting: number;
+      };
+      errors: string[];
+    }>(
       '/api/import/busy',
       { method: 'POST', body: fd },
       true

@@ -55,18 +55,98 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
     return res.status(400).json({ error: 'Invalid XML: ' + err.message });
   }
 
-  // Busy DAT root: <BusyData>...<Sales><Sale>...</Sale></Sales></BusyData>
+  // Busy DAT root may contain vouchers (<Sales><Sale>) and/or masters (<Accounts><Account>, <Items><Item>)
   const root = parsed.BusyData || parsed.busydata || parsed;
   const salesContainer = root.Sales || root.sales || {};
   const sales = asArray(salesContainer.Sale || salesContainer.sale);
-  if (sales.length === 0) {
-    return res.status(400).json({ error: 'No <Sale> entries found in file' });
+  const accountsContainer = root.Accounts || root.accounts || {};
+  const masterAccounts = asArray(accountsContainer.Account || accountsContainer.account);
+  const itemsContainer = root.Items || root.items || {};
+  const masterItems = asArray(itemsContainer.Item || itemsContainer.item);
+
+  if (sales.length === 0 && masterAccounts.length === 0 && masterItems.length === 0) {
+    return res.status(400).json({ error: 'No <Sale>, <Account> or <Item> entries found in file' });
   }
 
-  const stats = { totalInFile: sales.length, imported: 0, skippedExisting: 0, partiesCreated: 0, itemsCreated: 0, errors: [] };
+  const stats = {
+    totalInFile: sales.length,
+    imported: 0,
+    skippedExisting: 0,
+    partiesCreated: 0,
+    itemsCreated: 0,
+    masters: { accountsInFile: masterAccounts.length, itemsInFile: masterItems.length, partiesCreated: 0, partiesSkippedExisting: 0, partiesSkippedNonParty: 0, itemsCreated: 0, itemsSkippedExisting: 0 },
+    errors: [],
+  };
   const client = await pool.connect();
 
   try {
+    // ---------- MASTERS: Accounts (parties) ----------
+    for (const acc of masterAccounts) {
+      try {
+        const name = String(acc.Name || acc.name || '').trim();
+        if (!name) continue;
+
+        const parentGroup = String(acc.ParentGroup || acc.parentGroup || '').trim();
+        const pgLower = parentGroup.toLowerCase();
+        let partyType = null;
+        if (pgLower.includes('debtor') || pgLower.includes('customer')) partyType = 'Customer';
+        else if (pgLower.includes('creditor') || pgLower.includes('supplier') || pgLower.includes('vendor')) partyType = 'Supplier';
+        else { stats.masters.partiesSkippedNonParty++; continue; }
+
+        const { rows: existing } = await client.query('SELECT id FROM parties WHERE name = $1', [name]);
+        if (existing[0]) { stats.masters.partiesSkippedExisting++; continue; }
+
+        const addr = acc.Address || acc.address || {};
+        const addrParts = [
+          addr.Address1 || addr.address1, addr.Address2 || addr.address2, addr.Address3 || addr.address3,
+          addr.CityName || addr.cityName, addr.StateName || addr.stateName, addr.PinCode || addr.pinCode,
+        ].map((v) => (v == null ? '' : String(v).trim())).filter((v) => v && v !== '---Others---');
+        const address = addrParts.join(', ') || null;
+
+        const phone = String(addr.MobileNo || addr.mobileNo || addr.Phone1 || addr.phone1 || addr.Phone || acc.MobileNo || '').trim() || null;
+        const gstin = String(acc.GSTIN || acc.gstin || acc.PartyGSTIN || acc.GSTNo || addr.GSTIN || '').trim() || null;
+        const opening = num(acc.OPBal ?? acc.opBal);
+
+        await client.query(
+          `INSERT INTO parties (id, name, phone, address, gstin, party_type, opening_balance)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [randomUUID(), name, phone, address, gstin, partyType, opening]
+        );
+        stats.masters.partiesCreated++;
+      } catch (e) {
+        stats.errors.push(`Account ${acc.Name || '?'}: ${e.message}`);
+      }
+    }
+
+    // ---------- MASTERS: Items ----------
+    for (const it of masterItems) {
+      try {
+        const name = String(it.Name || it.name || '').trim();
+        if (!name) continue;
+
+        const { rows: existing } = await client.query('SELECT id FROM items WHERE name = $1', [name]);
+        if (existing[0]) { stats.masters.itemsSkippedExisting++; continue; }
+
+        const unit = String(it.MainUnit || it.mainUnit || it.Unit || 'Pcs').trim() || 'Pcs';
+        const mrp = num(it.MRP ?? it.mrp);
+        const purchase = num(it.PurchasePrice ?? it.purchasePrice);
+        const defaultPrice = mrp > 0 ? mrp : purchase;
+        const gstRate = parseGstRate(it.TaxCategory || it.taxCategory);
+        const hsn = String(it.HSNCode || it.hsnCode || it.HSN || '').trim() || null;
+        const category = String(it.ParentGroup || it.parentGroup || '').trim() || null;
+
+        await client.query(
+          `INSERT INTO items (id, name, hsn, unit, default_price, gst_rate, category)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [randomUUID(), name, hsn, unit, defaultPrice, gstRate, category]
+        );
+        stats.masters.itemsCreated++;
+      } catch (e) {
+        stats.errors.push(`Item ${it.Name || '?'}: ${e.message}`);
+      }
+    }
+
+    // ---------- VOUCHERS ----------
     for (const sale of sales) {
       try {
         const vchNoRaw = sale.VchNo ?? sale.vchNo;
