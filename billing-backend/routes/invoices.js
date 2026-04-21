@@ -46,7 +46,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     );
     if (!invRows[0]) return res.status(404).json({ error: 'Invoice not found' });
     const { rows: items } = await pool.query(
-      'SELECT * FROM invoice_items WHERE invoice_id = $1 ORDER BY created_at',
+      'SELECT * FROM invoice_items WHERE invoice_id = $1 ORDER BY id',
       [req.params.id]
     );
     const { rows: payments } = await pool.query(
