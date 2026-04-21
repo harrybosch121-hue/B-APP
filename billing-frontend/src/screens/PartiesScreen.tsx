@@ -67,15 +67,17 @@ export default function PartiesScreen({ navigate }: Props) {
              </thead>
              <tbody>
                {filtered.map((p) => {
-                 const overLimit = (p.credit_limit || 0) > 0 && (p.outstanding || 0) > (p.credit_limit || 0);
+                 const out = p.outstanding || 0;
+                 const overLimit = (p.credit_limit || 0) > 0 && out > (p.credit_limit || 0);
+                 const colorClass = out > 0 ? "text-destructive" : out < 0 ? "text-success" : "text-muted-foreground";
                  return (
                    <tr key={p.id} onClick={() => navigate("party-detail", { partyId: p.id })} className="border-t border-border/20 hover:bg-muted/30 cursor-pointer">
                      <td className="py-3 px-4 font-medium">{p.name}</td>
                      <td className="py-3 px-4 text-right text-muted-foreground">{p.invoice_count || 0}</td>
                      <td className="py-3 px-4 text-muted-foreground text-xs">{p.last_invoice_date ? fmtDate(p.last_invoice_date) : "—"}</td>
                      <td className="py-3 px-4 text-right text-muted-foreground">{p.total_invoiced ? fmtINR(p.total_invoiced) : "—"}</td>
-                     <td className={`py-3 px-4 text-right font-medium ${overLimit ? "text-destructive" : (p.outstanding || 0) > 0 ? "text-foreground" : "text-muted-foreground"}`}>
-                       {fmtINR(p.outstanding || 0)}{overLimit && " ⚠"}
+                     <td className={`py-3 px-4 text-right font-medium ${colorClass}`}>
+                       {fmtINR(out)}{overLimit && " ⚠"}
                      </td>
                    </tr>
                  );
