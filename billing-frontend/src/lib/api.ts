@@ -77,7 +77,7 @@ export interface Invoice {
   date: string;
   party_id: string | null;
   party_name?: string;
-  payment_mode: 'Cash' | 'Credit';
+  payment_mode: 'Cash' | 'Credit' | 'Acc';
   subtotal: number;
   gst_amount: number;
   total: number;

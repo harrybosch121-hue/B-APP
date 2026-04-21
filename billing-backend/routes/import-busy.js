@@ -308,13 +308,15 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
         const busyTotal = num(sale.tmpTotalAmt ?? sale.tmpSalePurcAmt);
         const total = busyTotal > 0 ? busyTotal : Math.max(0, lineGrossSum + sundryTotal);
 
-        // Payment mode
+        // Payment mode: Credit (no cash), Cash (POS cash), or Acc (book/account settlement)
         const ofInfo = ((sale.VchOtherInfoDetails || {}).OFInfo) || {};
         const ofText = String(ofInfo.OF1 || '').toUpperCase();
         const cashAmt = num(((sale.POSVchData || {}).CashAmt));
-        const isCredit = ofText.includes('CREDIT') && cashAmt <= 0;
-        const paymentMode = isCredit ? 'Credit' : 'Cash';
-        const paid = paymentMode === 'Cash' ? total : 0;
+        let paymentMode;
+        if (ofText.includes('CREDIT') && cashAmt <= 0) paymentMode = 'Credit';
+        else if (ofText.includes('CASH') || cashAmt > 0 || ofText === '') paymentMode = 'Cash';
+        else paymentMode = 'Acc'; // bank/account/other ledger settlement
+        const paid = paymentMode === 'Credit' ? 0 : total;
 
         await client.query('BEGIN');
         const invoiceId = randomUUID();

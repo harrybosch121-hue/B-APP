@@ -117,7 +117,7 @@ export default function InvoiceDetailScreen({ navigate, id }: Props) {
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Total</p>
             <p className="font-display text-3xl md:text-4xl text-primary">{fmtINR(inv.total)}</p>
-            <p className={`text-xs mt-1 ${inv.payment_mode === 'Cash' ? 'text-success' : 'text-primary'}`}>{inv.payment_mode}</p>
+            <p className={`text-xs mt-1 ${inv.payment_mode === 'Cash' ? 'text-success' : inv.payment_mode === 'Acc' ? 'text-amber-600' : 'text-primary'}`}>{inv.payment_mode}</p>
           </div>
         </div>
 

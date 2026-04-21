@@ -37,7 +37,7 @@ export default function InvoiceFormScreen({ navigate, editId }: Props) {
 
   const [date, setDate] = useState(todayISO());
   const [partyId, setPartyId] = useState<string>("");
-  const [paymentMode, setPaymentMode] = useState<"Cash" | "Credit">("Cash");
+  const [paymentMode, setPaymentMode] = useState<"Cash" | "Credit" | "Acc">("Cash");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
   const [partyQuery, setPartyQuery] = useState("");
@@ -175,7 +175,7 @@ export default function InvoiceFormScreen({ navigate, editId }: Props) {
         <div>
           <label className="text-xs uppercase tracking-wider text-muted-foreground">Payment Mode</label>
           <div className="mt-1.5 flex rounded-lg overflow-hidden border border-border">
-            {(["Cash", "Credit"] as const).map((m) => (
+            {(["Cash", "Credit", "Acc"] as const).map((m) => (
               <button
                 key={m}
                 type="button"

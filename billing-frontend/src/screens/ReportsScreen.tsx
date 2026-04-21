@@ -27,7 +27,7 @@ export default function ReportsScreen() {
         <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="px-3 py-2 rounded-lg bg-background/60 border border-border text-sm" />
         {tab === "Top Customers" && (
           <select value={topMode} onChange={(e) => setTopMode(e.target.value)} className="px-3 py-2 rounded-lg bg-background/60 border border-border text-sm">
-            <option value="">All</option><option value="Cash">Cash only</option><option value="Credit">Credit only</option>
+            <option value="">All</option><option value="Cash">Cash only</option><option value="Credit">Credit only</option><option value="Acc">Acc only</option>
           </select>
         )}
       </div>

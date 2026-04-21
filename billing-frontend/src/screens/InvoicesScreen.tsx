@@ -52,6 +52,7 @@ export default function InvoicesScreen({ navigate }: Props) {
           <option value="">All modes</option>
           <option value="Cash">Cash</option>
           <option value="Credit">Credit</option>
+          <option value="Acc">Acc</option>
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg bg-background/60 border border-border px-3 py-2.5 text-sm">
           <option value="">All status</option>
@@ -95,7 +96,7 @@ export default function InvoicesScreen({ navigate }: Props) {
                     <td className="py-3 px-4 text-muted-foreground">{fmtDate(inv.date)}</td>
                     <td className="py-3 px-4">{inv.party_name || "—"}</td>
                     <td className="py-3 px-4">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${inv.payment_mode === 'Cash' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${inv.payment_mode === 'Cash' ? 'bg-success/10 text-success' : inv.payment_mode === 'Acc' ? 'bg-amber-500/10 text-amber-600' : 'bg-primary/10 text-primary'}`}>
                         {inv.payment_mode}
                       </span>
                     </td>
