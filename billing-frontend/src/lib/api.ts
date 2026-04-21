@@ -25,8 +25,10 @@ async function request<T = unknown>(path: string, options: RequestInit = {}, isF
 export interface Party {
   id: string;
   name: string;
+  print_name?: string | null;
   phone: string | null;
   address: string | null;
+  state?: string | null;
   gstin: string | null;
   party_type: string;
   credit_limit: number;
@@ -37,9 +39,13 @@ export interface Party {
 export interface Item {
   id: string;
   name: string;
+  print_name?: string | null;
   hsn: string | null;
   unit: string;
   default_price: number;
+  purchase_price?: number;
+  opening_stock?: number;
+  current_stock?: number;
   gst_rate: number;
   category: string | null;
   low_stock_threshold: number;

@@ -13,6 +13,11 @@ const xmlParser = new XMLParser({
   attributeNamePrefix: '',
   parseAttributeValue: true,
   parseTagValue: true,
+  // Busy DAT files use thousands of &lt;/&gt; entities (e.g. "&lt;&lt;---None---&gt;&gt;" in every Item's
+  // TaxCategory). fast-xml-parser caps entity expansion at 1000 per doc and aborts otherwise.
+  // We don't need decoded <,> anywhere in our extraction, so skip entity processing entirely.
+  processEntities: false,
+  htmlEntities: false,
 });
 
 const asArray = (v) => (Array.isArray(v) ? v : v != null && v !== '' ? [v] : []);
@@ -105,12 +110,16 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
 
         const phone = String(addr.MobileNo || addr.mobileNo || addr.Phone1 || addr.phone1 || addr.Phone || acc.MobileNo || '').trim() || null;
         const gstin = String(acc.GSTIN || acc.gstin || acc.PartyGSTIN || acc.GSTNo || addr.GSTIN || '').trim() || null;
-        const opening = num(acc.OPBal ?? acc.opBal);
+        // Busy stores OPBal negative for credit (party owes us). Flip sign so positive = receivable.
+        const opening = -num(acc.OPBal ?? acc.opBal);
+        const stateRaw = String(addr.StateName || addr.stateName || '').trim();
+        const state = stateRaw && stateRaw !== '---Others---' ? stateRaw : null;
+        const printName = String(acc.PrintName || acc.printName || '').trim() || null;
 
         await client.query(
-          `INSERT INTO parties (id, name, phone, address, gstin, party_type, opening_balance)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [randomUUID(), name, phone, address, gstin, partyType, opening]
+          `INSERT INTO parties (id, name, print_name, phone, address, state, gstin, party_type, opening_balance)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [randomUUID(), name, printName, phone, address, state, gstin, partyType, opening]
         );
         stats.masters.partiesCreated++;
       } catch (e) {
@@ -134,11 +143,13 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
         const gstRate = parseGstRate(it.TaxCategory || it.taxCategory);
         const hsn = String(it.HSNCode || it.hsnCode || it.HSN || '').trim() || null;
         const category = String(it.ParentGroup || it.parentGroup || '').trim() || null;
+        const printName = String(it.PrintName || it.printName || '').trim() || null;
+        const openingStock = num(it.OPStockInMainUnit ?? it.opStockInMainUnit);
 
         await client.query(
-          `INSERT INTO items (id, name, hsn, unit, default_price, gst_rate, category)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [randomUUID(), name, hsn, unit, defaultPrice, gstRate, category]
+          `INSERT INTO items (id, name, print_name, hsn, unit, default_price, purchase_price, opening_stock, gst_rate, category)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [randomUUID(), name, printName, hsn, unit, defaultPrice, purchase, openingStock, gstRate, category]
         );
         stats.masters.itemsCreated++;
       } catch (e) {

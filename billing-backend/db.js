@@ -104,6 +104,13 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_invoices_party ON invoices(party_id);
     CREATE INDEX IF NOT EXISTS idx_payments_party ON payments(party_id);
     CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
+
+    -- Tier 1 migrations (Busy parity essentials)
+    ALTER TABLE parties ADD COLUMN IF NOT EXISTS state TEXT;
+    ALTER TABLE parties ADD COLUMN IF NOT EXISTS print_name TEXT;
+    ALTER TABLE items   ADD COLUMN IF NOT EXISTS purchase_price REAL DEFAULT 0;
+    ALTER TABLE items   ADD COLUMN IF NOT EXISTS opening_stock  REAL DEFAULT 0;
+    ALTER TABLE items   ADD COLUMN IF NOT EXISTS print_name     TEXT;
   `);
 
   const { rows } = await pool.query('SELECT COUNT(*) AS count FROM users');

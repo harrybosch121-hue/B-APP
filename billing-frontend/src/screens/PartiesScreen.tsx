@@ -15,7 +15,7 @@ export default function PartiesScreen({ navigate }: Props) {
   const { data, isLoading } = useQuery({ queryKey: ["parties"], queryFn: api.getParties });
   const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false);
-  const [draft, setDraft] = useState<Partial<Party>>({ name: "", phone: "", address: "", party_type: "Customer" });
+  const [draft, setDraft] = useState<Partial<Party>>({ name: "", phone: "", address: "", state: "", gstin: "", party_type: "Customer", opening_balance: 0 });
 
   const handleCreate = async () => {
     if (!draft.name) return toast.error("Name required");
@@ -23,7 +23,7 @@ export default function PartiesScreen({ navigate }: Props) {
       await api.createParty(draft);
       toast.success("Customer added");
       setShowForm(false);
-      setDraft({ name: "", phone: "", address: "", party_type: "Customer" });
+      setDraft({ name: "", phone: "", address: "", state: "", gstin: "", party_type: "Customer", opening_balance: 0 });
       qc.invalidateQueries({ queryKey: ["parties"] });
     } catch (err) {
       toast.error((err as Error).message);
@@ -98,12 +98,19 @@ export default function PartiesScreen({ navigate }: Props) {
                 { k: "name", label: "Name *" },
                 { k: "phone", label: "Phone" },
                 { k: "address", label: "Address" },
+                { k: "state", label: "State (for GST)" },
+                { k: "gstin", label: "GSTIN" },
               ].map(({ k, label }) => (
                 <div key={k}>
                   <label className="text-xs uppercase tracking-wider text-muted-foreground">{label}</label>
                   <input value={(draft as any)[k] || ""} onChange={(e) => setDraft({ ...draft, [k]: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" />
                 </div>
               ))}
+              <div>
+                <label className="text-xs uppercase tracking-wider text-muted-foreground">Opening Balance (\u20B9)</label>
+                <input type="number" value={draft.opening_balance ?? 0} onChange={(e) => setDraft({ ...draft, opening_balance: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" />
+                <p className="text-[10px] text-muted-foreground mt-1">Positive = customer owes you. Negative = advance paid.</p>
+              </div>
               <button onClick={handleCreate} className="w-full bg-primary text-primary-foreground rounded-lg py-2.5 font-medium btn-press hover:opacity-95 mt-2">Create Customer</button>
             </div>
           </div>

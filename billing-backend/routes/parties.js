@@ -57,15 +57,15 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 // POST create party
 router.post('/', requireAuth, async (req, res) => {
-  const { name, phone, address, gstin, party_type, credit_limit, opening_balance } = req.body;
+  const { name, print_name, phone, address, state, gstin, party_type, credit_limit, opening_balance } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
 
   try {
     const id = randomUUID();
     await pool.query(
-      `INSERT INTO parties (id, name, phone, address, gstin, party_type, credit_limit, opening_balance)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [id, name, phone || null, address || null, gstin || null, party_type || 'Customer', credit_limit || 0, opening_balance || 0]
+      `INSERT INTO parties (id, name, print_name, phone, address, state, gstin, party_type, credit_limit, opening_balance)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [id, name, print_name || null, phone || null, address || null, state || null, gstin || null, party_type || 'Customer', credit_limit || 0, opening_balance || 0]
     );
     const { rows } = await pool.query('SELECT * FROM parties WHERE id = $1', [id]);
     res.status(201).json(rows[0]);
@@ -78,12 +78,12 @@ router.post('/', requireAuth, async (req, res) => {
 
 // PUT update party
 router.put('/:id', requireAuth, async (req, res) => {
-  const { name, phone, address, gstin, party_type, credit_limit, opening_balance } = req.body;
+  const { name, print_name, phone, address, state, gstin, party_type, credit_limit, opening_balance } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE parties SET name=$1, phone=$2, address=$3, gstin=$4, party_type=$5, credit_limit=$6, opening_balance=$7
-       WHERE id=$8 RETURNING *`,
-      [name, phone, address, gstin, party_type, credit_limit || 0, opening_balance || 0, req.params.id]
+      `UPDATE parties SET name=$1, print_name=$2, phone=$3, address=$4, state=$5, gstin=$6, party_type=$7, credit_limit=$8, opening_balance=$9
+       WHERE id=$10 RETURNING *`,
+      [name, print_name || null, phone, address, state || null, gstin, party_type, credit_limit || 0, opening_balance || 0, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Party not found' });
     res.json(result.rows[0]);

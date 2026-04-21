@@ -12,10 +12,10 @@ export default function ItemsScreen() {
   const [q, setQ] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Partial<Item>>({ name: "", hsn: "", unit: "Pcs", default_price: 0, gst_rate: 18, low_stock_threshold: 0 });
+  const [draft, setDraft] = useState<Partial<Item>>({ name: "", hsn: "", unit: "Pcs", default_price: 0, purchase_price: 0, opening_stock: 0, gst_rate: 18, low_stock_threshold: 0 });
   const [pricesOpen, setPricesOpen] = useState<string | null>(null);
 
-  const openCreate = () => { setEditingId(null); setDraft({ name: "", hsn: "", unit: "Pcs", default_price: 0, gst_rate: 18, low_stock_threshold: 0 }); setShowForm(true); };
+  const openCreate = () => { setEditingId(null); setDraft({ name: "", hsn: "", unit: "Pcs", default_price: 0, purchase_price: 0, opening_stock: 0, gst_rate: 18, low_stock_threshold: 0 }); setShowForm(true); };
   const openEdit = (it: Item) => { setEditingId(it.id); setDraft(it); setShowForm(true); };
 
   const handleSave = async () => {
@@ -96,7 +96,11 @@ export default function ItemsScreen() {
                 <div><label className="text-xs uppercase tracking-wider text-muted-foreground">Unit</label><input value={draft.unit || ""} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" /></div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-xs uppercase tracking-wider text-muted-foreground">Default Price</label><input type="number" value={draft.default_price ?? ""} onChange={(e) => setDraft({ ...draft, default_price: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" /></div>
+                <div><label className="text-xs uppercase tracking-wider text-muted-foreground">Sale Price (MRP)</label><input type="number" value={draft.default_price ?? ""} onChange={(e) => setDraft({ ...draft, default_price: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" /></div>
+                <div><label className="text-xs uppercase tracking-wider text-muted-foreground">Purchase Price</label><input type="number" value={draft.purchase_price ?? ""} onChange={(e) => setDraft({ ...draft, purchase_price: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs uppercase tracking-wider text-muted-foreground">Opening Stock</label><input type="number" value={draft.opening_stock ?? ""} onChange={(e) => setDraft({ ...draft, opening_stock: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" /></div>
                 <div><label className="text-xs uppercase tracking-wider text-muted-foreground">GST %</label><input type="number" value={draft.gst_rate ?? ""} onChange={(e) => setDraft({ ...draft, gst_rate: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" /></div>
               </div>
               <div><label className="text-xs uppercase tracking-wider text-muted-foreground">Low Stock Threshold</label><input type="number" value={draft.low_stock_threshold ?? ""} onChange={(e) => setDraft({ ...draft, low_stock_threshold: Number(e.target.value) })} className="w-full mt-1 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" /></div>

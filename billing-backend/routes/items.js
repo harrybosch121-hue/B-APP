@@ -5,10 +5,19 @@ const requireAuth = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET all items
+// GET all items (with computed current stock = opening - sum invoiced qty)
 router.get('/', requireAuth, async (_req, res) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM items ORDER BY name');
+    const { rows } = await pool.query(`
+      SELECT i.*,
+        i.opening_stock - COALESCE((
+          SELECT SUM(ii.qty) FROM invoice_items ii
+          JOIN invoices iv ON iv.id = ii.invoice_id
+          WHERE ii.item_id = i.id AND iv.status = 'Active'
+        ), 0) AS current_stock
+      FROM items i
+      ORDER BY i.name
+    `);
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -37,15 +46,15 @@ router.get('/:id', requireAuth, async (req, res) => {
 
 // POST create item
 router.post('/', requireAuth, async (req, res) => {
-  const { name, hsn, unit, default_price, gst_rate, category, low_stock_threshold, linked_tile_id } = req.body;
+  const { name, print_name, hsn, unit, default_price, purchase_price, opening_stock, gst_rate, category, low_stock_threshold, linked_tile_id } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
 
   try {
     const id = randomUUID();
     await pool.query(
-      `INSERT INTO items (id, name, hsn, unit, default_price, gst_rate, category, low_stock_threshold, linked_tile_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [id, name, hsn || null, unit || 'Pcs', default_price || 0, gst_rate || 18, category || null, low_stock_threshold || 0, linked_tile_id || null]
+      `INSERT INTO items (id, name, print_name, hsn, unit, default_price, purchase_price, opening_stock, gst_rate, category, low_stock_threshold, linked_tile_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [id, name, print_name || null, hsn || null, unit || 'Pcs', default_price || 0, purchase_price || 0, opening_stock || 0, gst_rate || 18, category || null, low_stock_threshold || 0, linked_tile_id || null]
     );
     const { rows } = await pool.query('SELECT * FROM items WHERE id = $1', [id]);
     res.status(201).json(rows[0]);
@@ -58,12 +67,12 @@ router.post('/', requireAuth, async (req, res) => {
 
 // PUT update item
 router.put('/:id', requireAuth, async (req, res) => {
-  const { name, hsn, unit, default_price, gst_rate, category, low_stock_threshold, linked_tile_id } = req.body;
+  const { name, print_name, hsn, unit, default_price, purchase_price, opening_stock, gst_rate, category, low_stock_threshold, linked_tile_id } = req.body;
   try {
     const result = await pool.query(
-      `UPDATE items SET name=$1, hsn=$2, unit=$3, default_price=$4, gst_rate=$5, category=$6, low_stock_threshold=$7, linked_tile_id=$8
-       WHERE id=$9 RETURNING *`,
-      [name, hsn, unit, default_price || 0, gst_rate || 18, category, low_stock_threshold || 0, linked_tile_id || null, req.params.id]
+      `UPDATE items SET name=$1, print_name=$2, hsn=$3, unit=$4, default_price=$5, purchase_price=$6, opening_stock=$7, gst_rate=$8, category=$9, low_stock_threshold=$10, linked_tile_id=$11
+       WHERE id=$12 RETURNING *`,
+      [name, print_name || null, hsn, unit, default_price || 0, purchase_price || 0, opening_stock || 0, gst_rate || 18, category, low_stock_threshold || 0, linked_tile_id || null, req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Item not found' });
     res.json(result.rows[0]);
