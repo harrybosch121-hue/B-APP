@@ -170,6 +170,11 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
           stats.errors.push(`${labelPrefix}: missing VchNo`); return;
         }
         const vchNo = parseInt(vchNoRaw, 10);
+        if (!Number.isFinite(vchNo)) {
+          stats.errors.push(`${labelPrefix} "${vchNoRaw}": non-numeric VchNo (skipped)`);
+          if (isReturn) stats.returns.skippedExisting++; else stats.skippedExisting++;
+          return;
+        }
 
         // Idempotent: skip if already imported
         const { rows: existing } = await client.query(
