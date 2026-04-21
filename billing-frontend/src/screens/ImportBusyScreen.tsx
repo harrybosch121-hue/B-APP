@@ -1,0 +1,90 @@
+import { useRef, useState } from "react";
+import { api } from "@/lib/api";
+import { Upload, FileCheck, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
+
+export default function ImportBusyScreen() {
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Awaited<ReturnType<typeof api.importBusy>> | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = async () => {
+    if (!file) return toast.error("Choose a .DAT file");
+    setBusy(true);
+    setResult(null);
+    try {
+      const r = await api.importBusy(file);
+      setResult(r);
+      toast.success(`Imported ${r.imported} of ${r.totalInFile} invoices`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in max-w-3xl">
+      <header>
+        <h1 className="font-display text-4xl tracking-wide">Busy Import</h1>
+        <p className="text-sm text-muted-foreground mt-1">One-way import from Busy Accounting DAT exports</p>
+      </header>
+
+      <div className="premium-card rounded-2xl p-8 marble-noise relative">
+        <div
+          onClick={() => inputRef.current?.click()}
+          className="border-2 border-dashed border-border rounded-xl p-10 text-center cursor-pointer hover:border-primary/50 transition"
+        >
+          <Upload className="w-10 h-10 mx-auto text-muted-foreground" />
+          <p className="font-display text-xl mt-3">{file ? file.name : "Drop DAT file or click to browse"}</p>
+          <p className="text-xs text-muted-foreground mt-1">Accepts .DAT (Busy XML export)</p>
+          <input ref={inputRef} type="file" accept=".dat,.xml" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
+        </div>
+
+        <div className="flex justify-end gap-3 mt-6">
+          {file && <button onClick={() => setFile(null)} className="px-4 py-2 rounded-lg border border-border text-sm btn-press">Clear</button>}
+          <button onClick={handleImport} disabled={!file || busy} className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm shadow btn-press disabled:opacity-50 hover:opacity-95">
+            {busy ? "Importing..." : "Import"}
+          </button>
+        </div>
+
+        <div className="mt-6 text-xs text-muted-foreground bg-muted/30 rounded-lg p-4 space-y-1">
+          <p><strong className="text-foreground">How it works:</strong></p>
+          <p>• Reads &lt;Sale&gt; entries from Busy DAT XML</p>
+          <p>• Auto-creates parties and items as needed</p>
+          <p>• Existing invoices (matched by Busy VchNo) are <strong>skipped</strong> — safe to re-import</p>
+          <p>• Cash invoices auto-record full payment; Credit invoices remain outstanding</p>
+        </div>
+      </div>
+
+      {result && (
+        <div className="premium-card rounded-2xl p-6 space-y-4">
+          <h3 className="font-display text-2xl flex items-center gap-2"><FileCheck className="w-5 h-5 text-success" /> Import Complete</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Total in file" value={String(result.totalInFile)} />
+            <Stat label="Imported" value={String(result.imported)} good />
+            <Stat label="Skipped (existed)" value={String(result.skippedExisting)} />
+            <Stat label="Parties created" value={String(result.partiesCreated)} />
+            <Stat label="Items created" value={String(result.itemsCreated)} />
+          </div>
+          {result.errors.length > 0 && (
+            <div className="bg-destructive/5 border border-destructive/20 rounded-lg p-4 text-xs space-y-1 max-h-64 overflow-y-auto">
+              <p className="font-medium text-destructive flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {result.errors.length} errors</p>
+              {result.errors.slice(0, 50).map((e, i) => <p key={i} className="text-destructive/80">{e}</p>)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Stat({ label, value, good }: { label: string; value: string; good?: boolean }) {
+  return (
+    <div className="bg-background/40 rounded-xl p-3 border border-border/40">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`font-display text-2xl mt-0.5 ${good ? "text-success" : ""}`}>{value}</p>
+    </div>
+  );
+}
