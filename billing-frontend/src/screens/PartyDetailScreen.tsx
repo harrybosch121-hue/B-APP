@@ -127,6 +127,8 @@ function PartyLedger({ id, navigate }: { id: string; navigate: (s: Screen, ctx?:
   if (isLoading || !data) return <p className="text-sm text-muted-foreground py-8 text-center">Loading ledger…</p>;
   const opening = Number(data.opening) || 0;
   const closing = Number(data.closing) || 0;
+  const totalDebit = data.ledger.reduce((s, r) => s + (Number(r.debit) || 0), 0);
+  const totalCredit = data.ledger.reduce((s, r) => s + (Number(r.credit) || 0), 0);
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -166,8 +168,15 @@ function PartyLedger({ id, navigate }: { id: string; navigate: (s: Screen, ctx?:
               </tr>
             );
           })}
+          <tr className="bg-muted/30 border-t border-border/40">
+            <td className="py-3 pr-3 text-xs uppercase tracking-wider text-muted-foreground" colSpan={3}>Total</td>
+            <td className="py-3 pr-3 text-right font-medium">{fmtINR(totalDebit)}</td>
+            <td className="py-3 pr-3 text-right font-medium text-success">{fmtINR(totalCredit)}</td>
+            <td className="py-3 text-right text-xs text-muted-foreground"></td>
+          </tr>
           <tr className="bg-muted/30">
-            <td className="py-3 pr-3 font-display text-base" colSpan={5}>Closing Balance</td>
+            <td className="py-3 pr-3 font-display text-base" colSpan={3}>Closing Balance</td>
+            <td className="py-3 pr-3" colSpan={2}></td>
             <td className={`py-3 text-right font-display text-base ${closing > 0 ? "text-primary" : closing < 0 ? "text-success" : ""}`}>
               {fmtINR(Math.abs(closing))} {closing >= 0 ? "Dr" : "Cr"}
             </td>
