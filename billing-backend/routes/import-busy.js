@@ -376,49 +376,62 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
         const fyStart = (dt.getMonth() + 1) >= 4 ? dt.getFullYear() : dt.getFullYear() - 1;
         const tmpVchCode = String(jrn.tmpVchCode || jrn.tmpvchcode || '').trim();
         const vchNoTxt = String(jrn.VchNo || jrn.vchNo || '').trim();
-        const externalRef = `Jrnl:${fyStart}:${tmpVchCode || vchNoTxt}`;
+        const baseRef = `Jrnl:${fyStart}:${tmpVchCode || vchNoTxt}`;
 
-        // Find the party leg (Sundry Debtors/Creditors) and the contra leg
-        const partyLeg = entries.find(e => /Sundry/i.test(String(e.tmpGroupName || '')));
-        const contraLeg = entries.find(e => e !== partyLeg);
-        if (!partyLeg || !contraLeg) { stats.journals.skippedNoParty++; return; }
+        // A single Busy Journal can have MULTIPLE party legs paired with multiple contra legs
+        // (e.g. one Tr voucher transferring 50k + 100k from Bank to a customer in two rows).
+        // Iterate every Sundry-group leg as its own payment row, dedup'd by SrNo.
+        const partyLegs = entries.filter(e => /Sundry/i.test(String(e.tmpGroupName || '')));
+        const contraLegs = entries.filter(e => !/Sundry/i.test(String(e.tmpGroupName || '')));
+        if (!partyLegs.length || !contraLegs.length) { stats.journals.skippedNoParty++; return; }
 
-        const partyName = String(partyLeg.AccountName || '').trim();
-        if (!partyName) { stats.journals.skippedNoParty++; return; }
+        // Pair each party leg with the contra leg of the SAME amount + opposite AmountType (FIFO fallback).
+        const usedContras = new Set();
+        for (const partyLeg of partyLegs) {
+          const partyName = String(partyLeg.AccountName || '').trim();
+          if (!partyName) continue;
+          const { rows: pRows } = await client.query('SELECT id FROM parties WHERE name = $1', [partyName]);
+          if (!pRows[0]) { stats.journals.skippedNoParty++; continue; }
+          const partyId = pRows[0].id;
 
-        const { rows: pRows } = await client.query('SELECT id FROM parties WHERE name = $1', [partyName]);
-        if (!pRows[0]) { stats.journals.skippedNoParty++; return; }
-        const partyId = pRows[0].id;
+          const amount = num(partyLeg.AmtMainCur ?? partyLeg.amtMainCur);
+          if (!amount) continue;
+          const partyAmtType = String(partyLeg.AmountType || '');
 
-        const amount = num(partyLeg.AmtMainCur ?? partyLeg.amtMainCur ?? jrn.tmpTotalAmt);
-        if (!amount) { stats.journals.skippedNoParty++; return; }
+          // Find matching contra: same amount, opposite AmountType, not already used.
+          const oppType = partyAmtType === '2' ? '1' : '2';
+          let contraLeg = contraLegs.find(c => !usedContras.has(c) &&
+            num(c.AmtMainCur ?? c.amtMainCur) === amount &&
+            String(c.AmountType || '') === oppType);
+          if (!contraLeg) contraLeg = contraLegs.find(c => !usedContras.has(c)) || contraLegs[0];
+          if (contraLeg) usedContras.add(contraLeg);
 
-        // AmountType: 1 = Debit, 2 = Credit. Credit on a Sundry Debtor = customer paid us.
-        // Sign convention for our payments table: positive = reduces party outstanding.
-        const partyType = String(partyLeg.AmountType || '');
-        const sign = partyType === '2' ? 1 : -1; // credit => +amount, debit => -amount (rare contra)
+          const sign = partyAmtType === '2' ? 1 : -1; // credit on debtor = customer paid
 
-        // Mode from contra account name
-        const contraName = String(contraLeg.AccountName || '').toLowerCase();
-        let mode = 'Acc';
-        if (/cash/.test(contraName)) mode = 'Cash';
-        else if (/upi|gpay|paytm|phonepe/.test(contraName)) mode = 'UPI';
-        else if (/bank|hdfc|icici|sbi|axis|kotak/.test(contraName)) mode = 'Bank';
-        else if (/cheque|chq/.test(contraName)) mode = 'Cheque';
+          const contraName = String((contraLeg && contraLeg.AccountName) || '').toLowerCase();
+          let mode = 'Acc';
+          if (/cash/.test(contraName)) mode = 'Cash';
+          else if (/upi|gpay|paytm|phonepe/.test(contraName)) mode = 'UPI';
+          else if (/bank|hdfc|icici|sbi|axis|kotak/.test(contraName)) mode = 'Bank';
+          else if (/cheque|chq/.test(contraName)) mode = 'Cheque';
+          else if (/discount/i.test(String(jrn.VchNo || '')) || /profit|loss|discount/.test(contraName)) mode = 'Acc';
 
-        // Idempotent on (source, external_ref)
-        const { rows: dup } = await client.query(
-          `SELECT id FROM payments WHERE source = 'Busy' AND external_ref = $1`,
-          [externalRef]
-        );
-        if (dup[0]) { stats.journals.skippedExisting++; return; }
+          const srNo = String(partyLeg.SrNo || partyLeg.srNo || '').trim();
+          const externalRef = `${baseRef}:${srNo || partyName}`;
 
-        await client.query(
-          `INSERT INTO payments (id, party_id, invoice_id, amount, mode, date, notes, source, external_ref)
-           VALUES ($1, $2, NULL, $3, $4, $5, $6, 'Busy', $7)`,
-          [randomUUID(), partyId, sign * amount, mode, dateStr, `Busy Journal ${vchNoTxt || tmpVchCode}`.trim(), externalRef]
-        );
-        stats.journals.imported++;
+          const { rows: dup } = await client.query(
+            `SELECT id FROM payments WHERE source = 'Busy' AND external_ref = $1`,
+            [externalRef]
+          );
+          if (dup[0]) { stats.journals.skippedExisting++; continue; }
+
+          await client.query(
+            `INSERT INTO payments (id, party_id, invoice_id, amount, mode, date, notes, source, external_ref)
+             VALUES ($1, $2, NULL, $3, $4, $5, $6, 'Busy', $7)`,
+            [randomUUID(), partyId, sign * amount, mode, dateStr, `Busy Journal ${vchNoTxt || tmpVchCode}`.trim(), externalRef]
+          );
+          stats.journals.imported++;
+        }
       } catch (jErr) {
         stats.errors.push(`Journal ${jrn.VchNo || jrn.tmpVchCode || '?'}: ${jErr.message}`);
       }
