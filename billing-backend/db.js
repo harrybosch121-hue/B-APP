@@ -123,6 +123,10 @@ async function initDb() {
     END
     $pmig$;
 
+    -- One-shot cleanup: remove the old auto-payments the importer used to create for every Cash sale.
+    -- These mirrored the invoice and don't exist in Busy. Safe to run repeatedly (only matches that exact note).
+    DELETE FROM payments WHERE notes IN ('Auto from Busy import');
+
     -- Sale Returns (credit notes): same shape as invoices, just a different voucher_type.
     -- Busy reuses the same VchNo across types, so the old UNIQUE(invoice_no) constraint must go.
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voucher_type TEXT NOT NULL DEFAULT 'Sale';

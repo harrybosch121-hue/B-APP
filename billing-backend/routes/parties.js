@@ -7,20 +7,20 @@ const router = express.Router();
 
 // GET all parties with computed outstanding
 // Outstanding logic (matches Busy Sundry Debtor ledger):
-//   opening_balance + Σ(Active Credit invoices) − Σ(non-auto payments)
-//   Cash invoices hit Cash account directly in Busy and never touch the party ledger.
+//   opening_balance + Σ(Active Sale invoices, all payment modes) − Σ(payments).
+//   In Busy every sale debits the party; cash receipt is a separate Journal voucher (already in payments).
 router.get('/', requireAuth, async (_req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
         p.*,
         COALESCE(SUM(CASE WHEN i.status = 'Active' THEN i.total ELSE 0 END), 0) AS total_invoiced,
-        COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id AND COALESCE(notes,'') NOT LIKE 'Auto%'), 0) AS total_paid,
+        COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id), 0) AS total_paid,
         COUNT(CASE WHEN i.status = 'Active' AND COALESCE(i.voucher_type, 'Sale') = 'Sale' THEN 1 END) AS invoice_count,
         MAX(CASE WHEN i.status = 'Active' THEN i.date END) AS last_invoice_date,
         p.opening_balance
-          + COALESCE(SUM(CASE WHEN i.status = 'Active' AND i.payment_mode = 'Credit' THEN i.total ELSE 0 END), 0)
-          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id AND COALESCE(notes,'') NOT LIKE 'Auto%'), 0) AS outstanding
+          + COALESCE(SUM(CASE WHEN i.status = 'Active' THEN i.total ELSE 0 END), 0)
+          - COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id), 0) AS outstanding
       FROM parties p
       LEFT JOIN invoices i ON i.party_id = p.id
       GROUP BY p.id
@@ -50,11 +50,9 @@ router.get('/:id', requireAuth, async (req, res) => {
       [req.params.id]
     );
 
-    const totalInvoiced = invoices.filter(i => i.status === 'Active' && i.payment_mode === 'Credit')
+    const totalInvoiced = invoices.filter(i => i.status === 'Active')
       .reduce((s, i) => s + Number(i.total), 0);
-    const totalPaid = payments
-      .filter(p => !String(p.notes || '').startsWith('Auto'))
-      .reduce((s, p) => s + Number(p.amount), 0);
+    const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
     const outstanding = Number(party.opening_balance) + totalInvoiced - totalPaid;
 
     res.json({ ...party, invoices, payments, outstanding });
@@ -78,17 +76,15 @@ router.get('/:id/statement', requireAuth, async (req, res) => {
     if (from) { params.push(from); dateFilter.push(`AND date >= $${params.length}`); }
     if (to)   { params.push(to);   dateFilter.push(`AND date <= $${params.length}`); }
 
-    // Only Credit invoices belong on the Sundry Debtor ledger (Cash sales hit Cash a/c in Busy).
     const { rows: invoices } = await pool.query(
       `SELECT id, invoice_no, voucher_type, date, payment_mode, total, paid_amount, status
-       FROM invoices WHERE party_id = $1 AND status = 'Active' AND payment_mode = 'Credit' ${dateFilter.join(' ')}
+       FROM invoices WHERE party_id = $1 AND status = 'Active' ${dateFilter.join(' ')}
        ORDER BY date, invoice_no`,
       params
     );
-    // Hide auto-generated payments (mirror of cash invoices) from the ledger.
     const { rows: payments } = await pool.query(
       `SELECT id, date, amount, mode, invoice_id, notes
-       FROM payments WHERE party_id = $1 AND COALESCE(notes,'') NOT LIKE 'Auto%' ${dateFilter.join(' ')}
+       FROM payments WHERE party_id = $1 ${dateFilter.join(' ')}
        ORDER BY date, created_at`,
       params
     );
