@@ -343,16 +343,8 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
             [randomUUID(), invoiceId, lr.itemId, lr.itemName, lr.hsn, sign * lr.qty, lr.unit, lr.price, lr.gstRate, sign * lr.lineTotal]
           );
         }
-        // NOTE: We do NOT auto-create a payment for Cash sales here. In Busy, sale invoices
-        // always debit the party; the cash receipt is a separate Journal voucher (imported below).
-        // Only Sale Returns get an auto-refund (real Busy contra entry isn't always present).
-        if (isReturn && paid > 0) {
-          await client.query(
-            `INSERT INTO payments (id, party_id, invoice_id, amount, mode, date, notes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [randomUUID(), partyId, invoiceId, sign * paid, paymentMode, date, 'Auto-refund from Busy sale return']
-          );
-        }
+        // NOTE: We do NOT auto-create a payment for Cash sales OR Sale Returns. In Busy, sale invoices
+        // (and returns) always hit the party ledger directly; cash receipts/refunds are separate Journal vouchers.
         await client.query('COMMIT');
         if (isReturn) stats.returns.imported++; else stats.imported++;
       } catch (innerErr) {
