@@ -6,8 +6,8 @@ const requireAuth = require('../middleware/auth');
 const router = express.Router();
 
 // GET all parties with computed outstanding
-// Outstanding logic: opening_balance + every Active credit invoice (Sale = +, SaleReturn = -, already negated in DB)
-//   minus all payments (returns store a negative auto-refund payment, so summing payments still nets correctly)
+// Outstanding logic: opening_balance + every Active invoice (Sale=+, SaleReturn=-, already negated in DB)
+//   minus all payments. Cash invoices have a same-day auto-payment so net zero impact, matching Busy.
 router.get('/', requireAuth, async (_req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -18,7 +18,7 @@ router.get('/', requireAuth, async (_req, res) => {
         COUNT(CASE WHEN i.status = 'Active' AND COALESCE(i.voucher_type, 'Sale') = 'Sale' THEN 1 END) AS invoice_count,
         MAX(CASE WHEN i.status = 'Active' THEN i.date END) AS last_invoice_date,
         p.opening_balance
-          + COALESCE(SUM(CASE WHEN i.status = 'Active' AND i.payment_mode = 'Credit' THEN i.total ELSE 0 END), 0)
+          + COALESCE(SUM(CASE WHEN i.status = 'Active' THEN i.total ELSE 0 END), 0)
           - COALESCE((SELECT SUM(amount) FROM payments WHERE party_id = p.id), 0) AS outstanding
       FROM parties p
       LEFT JOIN invoices i ON i.party_id = p.id
@@ -49,7 +49,7 @@ router.get('/:id', requireAuth, async (req, res) => {
       [req.params.id]
     );
 
-    const totalInvoiced = invoices.filter(i => i.status === 'Active' && i.payment_mode === 'Credit')
+    const totalInvoiced = invoices.filter(i => i.status === 'Active')
       .reduce((s, i) => s + Number(i.total), 0);
     const totalPaid = payments.reduce((s, p) => s + Number(p.amount), 0);
     const outstanding = Number(party.opening_balance) + totalInvoiced - totalPaid;
@@ -96,11 +96,11 @@ router.get('/:id/statement', requireAuth, async (req, res) => {
       const amt = Number(i.total);
       events.push({
         date: i.date,
-        type: isReturn ? 'Sale Return' : (i.payment_mode === 'Credit' ? 'Credit Invoice' : 'Cash Invoice'),
+        type: isReturn ? 'Sale Return' : 'Sale',
         ref: `#${i.invoice_no}`,
         invoice_id: i.id,
-        // Only credit invoices add to receivable. Cash invoice is settled on day-1 by auto-payment row.
-        debit: i.payment_mode === 'Credit' && !isReturn ? amt : 0,
+        // Every sale debits the party in full (matches Busy). Returns store negative total so debit is negative.
+        debit: !isReturn ? amt : 0,
         credit: isReturn ? -amt : 0, // return total is stored negative; -(-x) = +x credit
       });
     }
