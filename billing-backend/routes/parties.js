@@ -98,6 +98,7 @@ router.get('/:id/statement', requireAuth, async (req, res) => {
         date: i.date,
         type: isReturn ? 'Sale Return' : (i.payment_mode === 'Credit' ? 'Credit Invoice' : 'Cash Invoice'),
         ref: `#${i.invoice_no}`,
+        invoice_id: i.id,
         // Only credit invoices add to receivable. Cash invoice is settled on day-1 by auto-payment row.
         debit: i.payment_mode === 'Credit' && !isReturn ? amt : 0,
         credit: isReturn ? -amt : 0, // return total is stored negative; -(-x) = +x credit
@@ -108,6 +109,7 @@ router.get('/:id/statement', requireAuth, async (req, res) => {
         date: p.date,
         type: `Payment (${p.mode})`,
         ref: p.invoice_id ? '' : (p.notes || 'On account'),
+        invoice_id: p.invoice_id || null,
         debit: 0,
         credit: Number(p.amount),
       });

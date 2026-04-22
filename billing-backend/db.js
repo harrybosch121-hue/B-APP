@@ -112,6 +112,17 @@ async function initDb() {
     ALTER TABLE items   ADD COLUMN IF NOT EXISTS opening_stock  REAL DEFAULT 0;
     ALTER TABLE items   ADD COLUMN IF NOT EXISTS print_name     TEXT;
 
+    -- Payments: source + external_ref so journal-imported receipts are idempotent
+    ALTER TABLE payments ADD COLUMN IF NOT EXISTS source       TEXT NOT NULL DEFAULT 'Manual';
+    ALTER TABLE payments ADD COLUMN IF NOT EXISTS external_ref TEXT;
+    DO $pmig$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_source_ref_unique') THEN
+        ALTER TABLE payments ADD CONSTRAINT payments_source_ref_unique UNIQUE (source, external_ref);
+      END IF;
+    END
+    $pmig$;
+
     -- Sale Returns (credit notes): same shape as invoices, just a different voucher_type.
     -- Busy reuses the same VchNo across types, so the old UNIQUE(invoice_no) constraint must go.
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voucher_type TEXT NOT NULL DEFAULT 'Sale';

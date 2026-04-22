@@ -80,56 +80,9 @@ export default function PartyDetailScreen({ navigate, goBack, id }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="premium-card rounded-2xl p-6">
-          <h2 className="font-display text-2xl mb-4">Invoices</h2>
-          {!party.invoices?.length ? <p className="text-sm text-muted-foreground py-8 text-center">No invoices.</p> :
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/40">
-                  <th className="py-2 pr-3">#</th><th className="py-2 pr-3">Date</th><th className="py-2 pr-3">Mode</th><th className="py-2 pr-3 text-right">Total</th><th className="py-2 text-right">Due</th>
-                </tr></thead>
-                <tbody>
-                  {party.invoices.map((inv) => {
-                    const due = Number(inv.total) - Number(inv.paid_amount);
-                    return (
-                      <tr key={inv.id} onClick={() => navigate("invoice-detail", { invoiceId: inv.id })} className="border-b border-border/20 hover:bg-muted/30 cursor-pointer">
-                        <td className="py-2 pr-3 font-medium">#{inv.invoice_no}</td>
-                        <td className="py-2 pr-3 text-muted-foreground">{fmtDate(inv.date)}</td>
-                        <td className="py-2 pr-3 text-xs">{inv.payment_mode}</td>
-                        <td className="py-2 pr-3 text-right">{fmtINR(inv.total)}</td>
-                        <td className={`py-2 text-right ${due > 0 ? "text-destructive" : "text-muted-foreground"}`}>{due > 0 ? fmtINR(due) : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          }
-        </div>
-
-        <div className="premium-card rounded-2xl p-6">
-          <h2 className="font-display text-2xl mb-4">Payments</h2>
-          {!party.payments?.length ? <p className="text-sm text-muted-foreground py-8 text-center">No payments recorded.</p> :
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/40">
-                  <th className="py-2 pr-3">Date</th><th className="py-2 pr-3">Mode</th><th className="py-2 pr-3">Notes</th><th className="py-2 text-right">Amount</th>
-                </tr></thead>
-                <tbody>
-                  {party.payments.map((pay) => (
-                    <tr key={pay.id} className="border-b border-border/20">
-                      <td className="py-2 pr-3 text-muted-foreground">{fmtDate(pay.date)}</td>
-                      <td className="py-2 pr-3 text-xs">{pay.mode}</td>
-                      <td className="py-2 pr-3 text-xs text-muted-foreground truncate max-w-[140px]">{pay.notes}</td>
-                      <td className="py-2 text-right font-medium text-success">{fmtINR(pay.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          }
-        </div>
+      <div className="premium-card rounded-2xl p-6">
+        <h2 className="font-display text-2xl mb-4">Account Ledger</h2>
+        <PartyLedger id={id} navigate={navigate} />
       </div>
 
       {showPayment && (
@@ -165,6 +118,62 @@ export default function PartyDetailScreen({ navigate, goBack, id }: Props) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PartyLedger({ id, navigate }: { id: string; navigate: (s: Screen, ctx?: { invoiceId?: string }) => void }) {
+  const { data, isLoading } = useQuery({ queryKey: ["party-ledger", id], queryFn: () => api.getPartyStatement(id) });
+  if (isLoading || !data) return <p className="text-sm text-muted-foreground py-8 text-center">Loading ledger…</p>;
+  const opening = Number(data.opening) || 0;
+  const closing = Number(data.closing) || 0;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border/40">
+            <th className="py-2 pr-3">Date</th>
+            <th className="py-2 pr-3">Type</th>
+            <th className="py-2 pr-3">Vch / Ref</th>
+            <th className="py-2 pr-3 text-right">Debit</th>
+            <th className="py-2 pr-3 text-right">Credit</th>
+            <th className="py-2 text-right">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="border-b border-border/20 bg-muted/20">
+            <td className="py-2 pr-3 text-muted-foreground italic" colSpan={3}>Opening Balance</td>
+            <td className="py-2 pr-3 text-right">—</td>
+            <td className="py-2 pr-3 text-right">—</td>
+            <td className="py-2 text-right font-medium">{fmtINR(Math.abs(opening))} {opening >= 0 ? "Dr" : "Cr"}</td>
+          </tr>
+          {data.ledger.length === 0 ? (
+            <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No transactions in this period.</td></tr>
+          ) : data.ledger.map((row, idx) => {
+            const clickable = !!row.invoice_id;
+            return (
+              <tr
+                key={idx}
+                onClick={() => clickable && navigate("invoice-detail", { invoiceId: row.invoice_id! })}
+                className={`border-b border-border/20 ${clickable ? "hover:bg-muted/30 cursor-pointer" : ""}`}
+              >
+                <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">{fmtDate(row.date)}</td>
+                <td className="py-2 pr-3 text-xs">{row.type}</td>
+                <td className="py-2 pr-3 text-xs font-medium">{row.ref || "—"}</td>
+                <td className="py-2 pr-3 text-right">{row.debit ? fmtINR(row.debit) : "—"}</td>
+                <td className="py-2 pr-3 text-right text-success">{row.credit ? fmtINR(row.credit) : "—"}</td>
+                <td className="py-2 text-right font-medium">{fmtINR(Math.abs(row.balance))} {row.balance >= 0 ? "Dr" : "Cr"}</td>
+              </tr>
+            );
+          })}
+          <tr className="bg-muted/30">
+            <td className="py-3 pr-3 font-display text-base" colSpan={5}>Closing Balance</td>
+            <td className={`py-3 text-right font-display text-base ${closing > 0 ? "text-primary" : closing < 0 ? "text-success" : ""}`}>
+              {fmtINR(Math.abs(closing))} {closing >= 0 ? "Dr" : "Cr"}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }

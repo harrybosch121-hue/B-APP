@@ -122,7 +122,7 @@ export const api = {
       opening: number;
       closing: number;
       generatedAt: string;
-      ledger: Array<{ date: string; type: string; ref: string; debit: number; credit: number; balance: number }>;
+      ledger: Array<{ date: string; type: string; ref: string; invoice_id?: string | null; debit: number; credit: number; balance: number }>;
     }>(`/api/parties/${id}/statement${qs ? `?${qs}` : ''}`);
   },
   createParty: (p: Partial<Party>) => request<Party>('/api/parties', { method: 'POST', body: JSON.stringify(p) }),
@@ -178,6 +178,7 @@ export const api = {
       partiesCreated: number;
       itemsCreated: number;
       returns: { totalInFile: number; imported: number; skippedExisting: number };
+      journals?: { totalInFile: number; imported: number; skippedExisting: number; skippedNoParty: number };
       masters: {
         accountsInFile: number;
         itemsInFile: number;

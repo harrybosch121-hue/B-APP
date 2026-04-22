@@ -22,6 +22,7 @@ export default function ImportBusyScreen() {
       const bits: string[] = [];
       if (r.totalInFile > 0) bits.push(`${r.imported}/${r.totalInFile} invoices`);
       if (r.returns && r.returns.totalInFile > 0) bits.push(`${r.returns.imported}/${r.returns.totalInFile} returns`);
+      if (r.journals && r.journals.totalInFile > 0) bits.push(`${r.journals.imported}/${r.journals.totalInFile} journals`);
       if (m.accountsInFile > 0) bits.push(`${m.partiesCreated} parties`);
       if (m.itemsInFile > 0) bits.push(`${m.itemsCreated} items`);
       const summary = bits.join(", ") || "0 records";
@@ -149,6 +150,18 @@ export default function ImportBusyScreen() {
                 <Stat label="Total in file" value={String(result.returns.totalInFile)} />
                 <Stat label="Imported" value={String(result.returns.imported)} good />
                 <Stat label="Skipped (existed)" value={String(result.returns.skippedExisting)} />
+              </div>
+            </div>
+          )}
+
+          {result.journals && result.journals.totalInFile > 0 && (
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Journals (Cash Receipts / Payments)</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Stat label="Total in file" value={String(result.journals.totalInFile)} />
+                <Stat label="Imported" value={String(result.journals.imported)} good />
+                <Stat label="Skipped (existed)" value={String(result.journals.skippedExisting)} />
+                <Stat label="Skipped (no party)" value={String(result.journals.skippedNoParty)} />
               </div>
             </div>
           )}
