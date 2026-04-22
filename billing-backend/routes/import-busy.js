@@ -179,10 +179,16 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
           return;
         }
 
-        // Idempotent: skip if already imported
+        // Compute FY start year (Apr-Mar). Busy restarts VchNo each FY,
+        // so the same VchNo across years must NOT collide.
+        const date = toIsoDate(sale.Date || sale.date);
+        const dt = new Date(date);
+        const fyStart = (dt.getMonth() + 1) >= 4 ? dt.getFullYear() : dt.getFullYear() - 1;
+
+        // Idempotent: skip if already imported for this FY
         const { rows: existing } = await client.query(
-          `SELECT id FROM invoices WHERE source = 'Busy' AND voucher_type = $1 AND invoice_no = $2`,
-          [voucherType, vchNo]
+          `SELECT id FROM invoices WHERE source = 'Busy' AND voucher_type = $1 AND fy_start = $2 AND invoice_no = $3`,
+          [voucherType, fyStart, vchNo]
         );
         if (existing[0]) {
           if (isReturn) stats.returns.skippedExisting++; else stats.skippedExisting++;
@@ -197,7 +203,6 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
           'Cash'
         ).trim() || 'Cash';
 
-        const date = toIsoDate(sale.Date || sale.date);
         const headerStpt = sale.STPTName || sale.stptName || '';
         const headerInclusive = isInclusiveTax(headerStpt);
         const headerRate = parseGstRate(headerStpt);
@@ -324,9 +329,9 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
         const sign = isReturn ? -1 : 1;
         const noteText = isReturn ? 'Sale Return imported from Busy DAT' : 'Imported from Busy DAT';
         await client.query(
-          `INSERT INTO invoices (id, invoice_no, voucher_type, date, party_id, payment_mode, subtotal, gst_amount, total, paid_amount, status, source, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Active', 'Busy', $11)`,
-          [invoiceId, vchNo, voucherType, date, partyId, paymentMode, sign * subtotal, sign * gstAmount, sign * total, sign * paid, noteText]
+          `INSERT INTO invoices (id, invoice_no, voucher_type, fy_start, date, party_id, payment_mode, subtotal, gst_amount, total, paid_amount, status, source, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'Active', 'Busy', $12)`,
+          [invoiceId, vchNo, voucherType, fyStart, date, partyId, paymentMode, sign * subtotal, sign * gstAmount, sign * total, sign * paid, noteText]
         );
         for (const lr of lineRows) {
           await client.query(

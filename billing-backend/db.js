@@ -115,13 +115,26 @@ async function initDb() {
     -- Sale Returns (credit notes): same shape as invoices, just a different voucher_type.
     -- Busy reuses the same VchNo across types, so the old UNIQUE(invoice_no) constraint must go.
     ALTER TABLE invoices ADD COLUMN IF NOT EXISTS voucher_type TEXT NOT NULL DEFAULT 'Sale';
+
+    -- Busy restarts VchNo each financial year (Apr-Mar). Add fy_start (year of FY start) so
+    -- the same invoice_no across years doesn't collide.
+    ALTER TABLE invoices ADD COLUMN IF NOT EXISTS fy_start INTEGER;
+    UPDATE invoices SET fy_start = CASE
+      WHEN EXTRACT(MONTH FROM date) >= 4 THEN EXTRACT(YEAR FROM date)::int
+      ELSE EXTRACT(YEAR FROM date)::int - 1
+    END WHERE fy_start IS NULL;
+
     DO $migrate$
     BEGIN
       IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'invoices_invoice_no_key') THEN
         ALTER TABLE invoices DROP CONSTRAINT invoices_invoice_no_key;
       END IF;
-      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'invoices_source_type_no_unique') THEN
-        ALTER TABLE invoices ADD CONSTRAINT invoices_source_type_no_unique UNIQUE (source, voucher_type, invoice_no);
+      -- Drop the old (no-FY) unique so we can replace with FY-aware one
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'invoices_source_type_no_unique') THEN
+        ALTER TABLE invoices DROP CONSTRAINT invoices_source_type_no_unique;
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'invoices_source_type_fy_no_unique') THEN
+        ALTER TABLE invoices ADD CONSTRAINT invoices_source_type_fy_no_unique UNIQUE (source, voucher_type, fy_start, invoice_no);
       END IF;
     END
     $migrate$;
