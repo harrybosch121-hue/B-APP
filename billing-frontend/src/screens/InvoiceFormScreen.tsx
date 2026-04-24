@@ -69,14 +69,18 @@ export default function InvoiceFormScreen({ navigate, editId }: Props) {
   const filteredParties = useMemo(() => {
     const q = partyQuery.trim().toLowerCase();
     if (!q) return (parties || []).slice(0, 8);
-    const out = [];
+    const prefix = [];
+    const wordPrefix = [];
+    const contains = [];
     for (const p of parties || []) {
-      if (p.name.toLowerCase().includes(q) || (p.phone || "").includes(q)) {
-        out.push(p);
-        if (out.length >= 8) break;
-      }
+      const name = p.name.toLowerCase();
+      const phone = p.phone || "";
+      if (name.startsWith(q)) prefix.push(p);
+      else if (name.split(/\s+/).some((w) => w.startsWith(q))) wordPrefix.push(p);
+      else if (name.includes(q) || phone.includes(q)) contains.push(p);
+      if (prefix.length >= 8) break;
     }
-    return out;
+    return [...prefix, ...wordPrefix, ...contains].slice(0, 8);
   }, [parties, partyQuery]);
 
   const subtotal = lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.price || 0), 0);
