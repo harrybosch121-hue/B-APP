@@ -343,8 +343,24 @@ router.post('/busy', requireAuth, upload.single('file'), async (req, res) => {
             [randomUUID(), invoiceId, lr.itemId, lr.itemName, lr.hsn, sign * lr.qty, lr.unit, lr.price, lr.gstRate, sign * lr.lineTotal]
           );
         }
-        // NOTE: We do NOT auto-create a payment for Cash sales OR Sale Returns. In Busy, sale invoices
-        // (and returns) always hit the party ledger directly; cash receipts/refunds are separate Journal vouchers.
+        // POS split-cash: Busy posts only the NET (total - cashAmt) as the debit on the party
+        // ledger, with the cash leg going straight to Cash a/c. We always record the invoice at
+        // full total (matches the printed bill); to mirror Busy's party ledger we add a same-day
+        // Cash payment for the cashAmt portion. Idempotent via external_ref.
+        if (!isReturn && cashAmt > 0 && cashAmt < total) {
+          const posRef = `POS:${fyStart}:${vchNo}`;
+          const { rows: dupPos } = await client.query(
+            `SELECT id FROM payments WHERE source = 'Busy' AND external_ref = $1`,
+            [posRef]
+          );
+          if (!dupPos[0]) {
+            await client.query(
+              `INSERT INTO payments (id, party_id, invoice_id, amount, mode, date, notes, source, external_ref)
+               VALUES ($1, $2, $3, $4, 'Cash', $5, $6, 'Busy', $7)`,
+              [randomUUID(), partyId, invoiceId, cashAmt, date, `POS cash from invoice #${vchNo}`, posRef]
+            );
+          }
+        }
         await client.query('COMMIT');
         if (isReturn) stats.returns.imported++; else stats.imported++;
       } catch (innerErr) {
