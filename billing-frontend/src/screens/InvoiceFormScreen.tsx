@@ -41,6 +41,7 @@ export default function InvoiceFormScreen({ navigate, editId }: Props) {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([newLine()]);
   const [partyQuery, setPartyQuery] = useState("");
+  const [partyFocused, setPartyFocused] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -66,8 +67,16 @@ export default function InvoiceFormScreen({ navigate, editId }: Props) {
   }, [existing.data]);
 
   const filteredParties = useMemo(() => {
-    const q = partyQuery.toLowerCase();
-    return (parties || []).filter((p) => !q || p.name.toLowerCase().includes(q));
+    const q = partyQuery.trim().toLowerCase();
+    if (!q) return (parties || []).slice(0, 8);
+    const out = [];
+    for (const p of parties || []) {
+      if (p.name.toLowerCase().includes(q) || (p.phone || "").includes(q)) {
+        out.push(p);
+        if (out.length >= 8) break;
+      }
+    }
+    return out;
   }, [parties, partyQuery]);
 
   const subtotal = lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.price || 0), 0);
@@ -153,24 +162,39 @@ export default function InvoiceFormScreen({ navigate, editId }: Props) {
           <label className="text-xs uppercase tracking-wider text-muted-foreground">Date</label>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full mt-1.5 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none" />
         </div>
-        <div>
+        <div className="relative">
           <label className="text-xs uppercase tracking-wider text-muted-foreground">Party</label>
           <input
-            list="party-list"
             value={partyQuery || (partyId ? parties?.find((p) => p.id === partyId)?.name || "" : "")}
             onChange={(e) => {
-              const v = e.target.value;
-              setPartyQuery(v);
-              const match = parties?.find((p) => p.name.toLowerCase() === v.toLowerCase());
-              if (match) setPartyId(match.id);
-              else setPartyId("");
+              setPartyQuery(e.target.value);
+              setPartyId("");
             }}
-            placeholder="Search or select customer"
+            onFocus={() => setPartyFocused(true)}
+            onBlur={() => setTimeout(() => setPartyFocused(false), 150)}
+            placeholder="Search customer (name or phone)"
             className="w-full mt-1.5 px-3 py-2 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none"
+            autoComplete="off"
           />
-          <datalist id="party-list">
-            {filteredParties.map((p) => <option key={p.id} value={p.name} />)}
-          </datalist>
+          {partyFocused && filteredParties.length > 0 && (
+            <ul className="absolute z-20 left-0 right-0 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-background shadow-lg">
+              {filteredParties.map((p) => (
+                <li
+                  key={p.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setPartyId(p.id);
+                    setPartyQuery("");
+                    setPartyFocused(false);
+                  }}
+                  className="px-3 py-2 text-sm cursor-pointer hover:bg-muted/40 border-b border-border/20 last:border-b-0"
+                >
+                  <div className="font-medium">{p.name}</div>
+                  {p.phone && <div className="text-xs text-muted-foreground">{p.phone}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <div>
           <label className="text-xs uppercase tracking-wider text-muted-foreground">Payment Mode</label>
