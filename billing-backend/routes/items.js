@@ -25,6 +25,17 @@ router.get('/', requireAuth, async (_req, res) => {
   }
 });
 
+// GET public item names for external inventory sync
+router.get('/public', async (_req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT id, name FROM items ORDER BY name');
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET single item with customer price overrides
 router.get('/:id', requireAuth, async (req, res) => {
   try {
