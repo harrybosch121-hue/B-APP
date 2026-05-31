@@ -1,7 +1,9 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { initDb } = require('./db');
+const cron = require('node-cron');
+const { initDb, pool } = require('./db');
+const { sendBackup } = require('./telegram');
 
 const authRoutes = require('./routes/auth');
 const partiesRoutes = require('./routes/parties');
@@ -16,9 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+  .split(',').map((s) => s.trim()).filter(Boolean);
 
 app.use(cors({
   origin: (origin, cb) => {
@@ -41,6 +41,16 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/import', importBusyRoutes);
 app.use('/api/backup', backupRoutes);
 
+// Manual Telegram backup trigger (admin only via backup route)
+app.post('/api/telegram-backup', async (_req, res) => {
+  try {
+    const result = await sendBackup(pool);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
@@ -50,8 +60,20 @@ app.use((err, _req, res, _next) => {
   try {
     await initDb();
     app.listen(PORT, () => console.log(`Billing backend listening on :${PORT}`));
+
+    // Daily Telegram backup at 2:30 AM
+    cron.schedule('30 2 * * *', async () => {
+      console.log('Running scheduled billing Telegram backup...');
+      try {
+        await sendBackup(pool);
+        console.log('Billing backup sent successfully');
+      } catch (err) {
+        console.error('Billing backup failed:', err.message);
+      }
+    });
   } catch (err) {
     console.error('Failed to start:', err);
     process.exit(1);
   }
 })();
+
