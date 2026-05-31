@@ -61,8 +61,8 @@ app.use((err, _req, res, _next) => {
     await initDb();
     app.listen(PORT, () => console.log(`Billing backend listening on :${PORT}`));
 
-    // Daily Telegram backup at 2:30 AM
-    cron.schedule('30 2 * * *', async () => {
+    // Hourly Telegram backup
+    cron.schedule('0 * * * *', async () => {
       console.log('Running scheduled billing Telegram backup...');
       try {
         await sendBackup(pool);
