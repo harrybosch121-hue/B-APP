@@ -61,6 +61,11 @@ app.use((err, _req, res, _next) => {
     await initDb();
     app.listen(PORT, () => console.log(`Billing backend listening on :${PORT}`));
 
+    // Keep DB connection pool warm every 14 min (prevents Railway cold-start DB reconnect)
+    cron.schedule('*/14 * * * *', async () => {
+      try { await pool.query('SELECT 1'); } catch (e) { console.error('Keepalive failed:', e.message); }
+    });
+
     // Hourly Telegram backup
     cron.schedule('0 * * * *', async () => {
       console.log('Running scheduled billing Telegram backup...');
