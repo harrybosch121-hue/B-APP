@@ -1,0 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 37 27% 95%;
+    --foreground: 0 0% 17%;
+
+    --card: 40 20% 97%;
+    --card-foreground: 0 0% 17%;
+
+    --popover: 40 20% 97%;
+    --popover-foreground: 0 0% 17%;
+
+    --primary: 42 52% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 37 22% 92%;
+    --secondary-foreground: 0 0% 17%;
+
+    --muted: 35 18% 91%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 42 52% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 37 18% 87%;
+    --input: 37 18% 87%;
+    --ring: 42 52% 53%;
+
+    --radius: 0.75rem;
+
+    --gold: 42 52% 53%;
+    --gold-foreground: 0 0% 100%;
+    --ivory: 37 27% 95%;
+    --beige: 30 20% 90%;
+    --charcoal: 0 0% 17%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cormorant Garamond', serif;
+  }
+}
+
+/* Premium luxury background */
+.premium-bg {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 40%, hsl(42 52% 53% / 0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 50%, hsl(37 27% 95%) 0%, hsl(30 20% 90%) 50%, hsl(0 0% 90%) 100%);
+  position: relative;
+}
+
+.premium-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 30%, hsl(42 52% 53% / 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 80% 60%, hsl(42 52% 53% / 0.03) 0%, transparent 40%);
+  pointer-events: none;
+}
+
+.premium-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 50%, hsl(0 0% 17% / 0.04) 100%);
+  pointer-events: none;
+}
+
+/* Spotlight glow for hero sections */
+.spotlight {
+  position: relative;
+}
+
+.spotlight::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, hsl(42 52% 53% / 0.10) 0%, hsl(42 52% 53% / 0.03) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Glass card - premium */
+.glass {
+  background: hsl(40 20% 97% / 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid hsl(42 52% 53% / 0.08);
+  box-shadow: 0 8px 32px hsl(0 0% 17% / 0.04), 0 1px 2px hsl(0 0% 17% / 0.02);
+}
+
+.glass-dark {
+  background: hsl(0 0% 17% / 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+}
+
+/* Premium card with subtle glass */
+.premium-card {
+  background: hsl(40 20% 97% / 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid hsl(42 52% 53% / 0.06);
+  box-shadow: 0 4px 24px hsl(0 0% 17% / 0.03), 0 1px 3px hsl(0 0% 17% / 0.02);
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted-foreground) / 0.08) 50%, hsl(var(--muted)) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Premium button press */
+.btn-press {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-press:active {
+  transform: scale(0.96);
+}
+
+/* Marble noise texture overlay */
+.marble-noise::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  pointer-events: none;
+}
