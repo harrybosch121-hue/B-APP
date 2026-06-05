@@ -12,7 +12,7 @@ export default function SundryDebtorsScreen() {
   const debtors = (data || []).filter(
     (p) =>
       p.party_type === "Customer" &&
-      (!q || p.name.toLowerCase().includes(q.toLowerCase()) || (p.phone || "").includes(q) || (p.gstin || "").toLowerCase().includes(q.toLowerCase()))
+      (!q || p.name.toLowerCase().includes(q.toLowerCase()))
   );
 
   const totalOutstanding = debtors.reduce((s, d) => s + (d.outstanding || 0), 0);
@@ -41,7 +41,7 @@ export default function SundryDebtorsScreen() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by name, phone or GSTIN..."
+            placeholder="Search by name..."
             className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-background/60 border border-border focus:border-primary focus:outline-none text-sm"
           />
         </div>
@@ -59,9 +59,6 @@ export default function SundryDebtorsScreen() {
               <thead className="bg-muted/30">
                 <tr className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                   <th className="py-3 px-4 whitespace-nowrap">Name</th>
-                  <th className="py-3 px-4 whitespace-nowrap">GSTIN</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Phone</th>
-                  <th className="py-3 px-4 whitespace-nowrap">Address</th>
                   <th className="py-3 px-4 text-right whitespace-nowrap">Op. Bal.</th>
                   <th className="py-3 px-4 text-right whitespace-nowrap">Cr. Limit</th>
                   <th className="py-3 px-4 text-right whitespace-nowrap">Invoiced</th>
@@ -83,9 +80,7 @@ export default function SundryDebtorsScreen() {
                           <div className="text-[10px] text-muted-foreground">{d.print_name}</div>
                         )}
                       </td>
-                      <td className="py-3 px-4 font-mono text-xs whitespace-nowrap text-muted-foreground">{d.gstin || "—"}</td>
-                      <td className="py-3 px-4 text-muted-foreground whitespace-nowrap text-xs">{d.phone || "—"}</td>
-                      <td className="py-3 px-4 text-muted-foreground text-xs max-w-[200px] truncate" title={d.address || ""}>{d.address || "—"}</td>
+
                       <td className={`py-3 px-4 text-right font-medium whitespace-nowrap ${d.opening_balance > 0 ? "text-destructive" : d.opening_balance < 0 ? "text-success" : "text-muted-foreground"}`}>
                         {fmtINR(d.opening_balance)}
                       </td>
