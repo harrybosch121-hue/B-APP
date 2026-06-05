@@ -4,7 +4,8 @@
       "PowerShell(Test-Path *)",
       "PowerShell(git init *)",
       "PowerShell(git *)",
-      "PowerShell(git pull *)"
+      "PowerShell(git pull *)",
+      "PowerShell(git push *)"
     ]
   }
 }

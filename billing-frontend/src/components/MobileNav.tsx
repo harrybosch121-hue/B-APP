@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LayoutDashboard, FileText, Users, Package, BarChart3, Upload, Database, LogOut, Plus, Menu, X } from "lucide-react";
+import { LayoutDashboard, FileText, Users, Package, BarChart3, Upload, LogOut, Plus, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Screen } from "@/App";
 
@@ -16,7 +16,6 @@ const tabs: { id: Screen; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "items", label: "Items", icon: Package },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "import", label: "Busy Import", icon: Upload },
-  { id: "debot", label: "Debot Import", icon: Database },
 ];
 
 export default function MobileNav({ active, navigate, onLogout }: MobileNavProps) {

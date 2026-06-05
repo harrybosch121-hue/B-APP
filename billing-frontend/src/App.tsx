@@ -15,7 +15,6 @@ import PartyDetailScreen from "@/screens/PartyDetailScreen";
 import ItemsScreen from "@/screens/ItemsScreen";
 import ReportsScreen from "@/screens/ReportsScreen";
 import ImportBusyScreen from "@/screens/ImportBusyScreen";
-import DebotScreen from "@/screens/DebotScreen";
 import PartyStatementScreen from "@/screens/PartyStatementScreen";
 
 const queryClient = new QueryClient({
@@ -33,8 +32,7 @@ export type Screen =
   | "party-statement"
   | "items"
   | "reports"
-  | "import"
-  | "debot";
+  | "import";
 
 const App = () => {
   const [loggedIn, setLoggedIn] = useState(() => !!localStorage.getItem("billing_auth_token"));
@@ -106,8 +104,6 @@ const App = () => {
         return <ReportsScreen />;
       case "import":
         return <ImportBusyScreen />;
-      case "debot":
-        return <DebotScreen />;
       default:
         return <DashboardScreen navigate={navigate} />;
     }
