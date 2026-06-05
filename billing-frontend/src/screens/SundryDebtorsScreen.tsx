@@ -8,18 +8,18 @@ export default function SundryDebtorsScreen() {
   const { data, isLoading } = useQuery({ queryKey: ["parties"], queryFn: api.getParties });
   const [q, setQ] = useState("");
 
-  // Only customers (Sundry Debtors = party_type 'Customer'), sorted A-Z by name
+  // Only debtors who actually owe money (outstanding > 0), sorted A-Z by name
   const debtors = (data || [])
     .filter(
       (p) =>
         p.party_type === "Customer" &&
+        (p.outstanding || 0) > 0 &&
         (!q || p.name.toLowerCase().includes(q.toLowerCase()))
     )
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const totalOutstanding = debtors.reduce((s, d) => s + (d.outstanding || 0), 0);
   const totalInvoiced = debtors.reduce((s, d) => s + (d.total_invoiced || 0), 0);
-  const overdueCount = debtors.filter((d) => (d.outstanding || 0) > 0).length;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -29,11 +29,10 @@ export default function SundryDebtorsScreen() {
       </header>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <SummaryCard label="Total Debtors" value={String(debtors.length)} icon={<Users className="w-4 h-4" />} />
         <SummaryCard label="Total Invoiced" value={fmtINR(totalInvoiced)} />
         <SummaryCard label="Outstanding" value={fmtINR(totalOutstanding)} highlight={totalOutstanding > 0 ? "destructive" : "success"} />
-        <SummaryCard label="With Dues" value={String(overdueCount)} highlight="warning" />
       </div>
 
       {/* Search */}
