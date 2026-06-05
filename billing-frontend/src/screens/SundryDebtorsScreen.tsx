@@ -8,12 +8,14 @@ export default function SundryDebtorsScreen() {
   const { data, isLoading } = useQuery({ queryKey: ["parties"], queryFn: api.getParties });
   const [q, setQ] = useState("");
 
-  // Only customers (Sundry Debtors = party_type 'Customer')
-  const debtors = (data || []).filter(
-    (p) =>
-      p.party_type === "Customer" &&
-      (!q || p.name.toLowerCase().includes(q.toLowerCase()))
-  );
+  // Only customers (Sundry Debtors = party_type 'Customer'), sorted A-Z by name
+  const debtors = (data || [])
+    .filter(
+      (p) =>
+        p.party_type === "Customer" &&
+        (!q || p.name.toLowerCase().includes(q.toLowerCase()))
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const totalOutstanding = debtors.reduce((s, d) => s + (d.outstanding || 0), 0);
   const totalInvoiced = debtors.reduce((s, d) => s + (d.total_invoiced || 0), 0);
