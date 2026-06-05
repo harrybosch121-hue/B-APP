@@ -3,7 +3,8 @@
     "allow": [
       "PowerShell(Test-Path *)",
       "PowerShell(git init *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "PowerShell(git pull *)"
     ]
   }
 }
