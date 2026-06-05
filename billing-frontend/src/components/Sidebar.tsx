@@ -1,4 +1,4 @@
-import { LayoutDashboard, FileText, Users, Package, BarChart3, Upload, LogOut, Plus } from "lucide-react";
+import { LayoutDashboard, FileText, Users, Package, BarChart3, Upload, Wallet, LogOut, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Screen } from "@/App";
 
@@ -12,6 +12,7 @@ const tabs: { id: Screen; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "invoices", label: "Invoices", icon: FileText },
   { id: "parties", label: "Customers", icon: Users },
+  { id: "sundry", label: "Sundry Debtors", icon: Wallet },
   { id: "items", label: "Items", icon: Package },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "import", label: "Busy Import", icon: Upload },
